@@ -13,7 +13,7 @@ const PORT = 3000;
 // ============================
 app.use(cors());
 app.use(express.json());
-app.use(express.static("public"));
+app.use(express.static(path.join(__dirname)));
 
 const EXCEL_PATH = path.join(__dirname, "CATMAT.xlsx");
 const JSON_PATH = path.join(__dirname, "catmat.json");
@@ -47,6 +47,11 @@ const CATMAT = JSON.parse(fs.readFileSync(JSON_PATH, "utf-8"));
 // ============================
 // 3. ROTAS
 // ============================
+
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "index.html"));
+});
+
 
 // Rota para obter os primeiros 100 itens (exemplo para preencher combo)
 app.get("/itens", (req, res) => {
