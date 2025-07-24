@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <title>Consulta de Preço - Governo Federal</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    :root {
+      --cor-primaria: #38b2ac;
+      --cor-secundaria: #2c3e50;
+      --cor-fundo: #f9fafb;
+      --cor-branca: #ffffff;
+      --cor-erro: #e74c3c;
+      --cor-sucesso: #d1fae5;
+      --cor-texto: #1f2937;
+      --cor-realce: #edfdfd;
+      --borda: #e5e7eb;
+    }
+
+    * {
+      box-sizing: border-box;
+      font-family: 'Segoe UI', Roboto, Helvetica, sans-serif;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--cor-fundo);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .container {
+      background-color: var(--cor-branca);
+      padding: 32px;
+      border-radius: 16px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.06);
+      max-width: 600px;
+      width: 100%;
+      transition: all 0.3s ease-in-out;
+    }
+
+    h2 {
+      text-align: center;
+      color: var(--cor-secundaria);
+      margin-bottom: 24px;
+      font-size: 24px;
+    }
+
+    label {
+      display: block;
+      margin-top: 18px;
+      margin-bottom: 6px;
+      font-weight: 600;
+      color: var(--cor-texto);
+    }
+
+    input,
+    select,
+    button {
+      width: 100%;
+      padding: 12px 14px;
+      font-size: 16px;
+      border-radius: 10px;
+      border: 1px solid var(--borda);
+      transition: border 0.2s, box-shadow 0.2s;
+    }
+
+    input:focus,
+    select:focus {
+      border-color: var(--cor-primaria);
+      box-shadow: 0 0 0 3px rgba(56, 178, 172, 0.2);
+      outline: none;
+    }
+
+    button {
+      background-color: var(--cor-primaria);
+      color: white;
+      font-weight: bold;
+      margin-top: 24px;
+      cursor: pointer;
+      border: none;
+      transition: background 0.3s ease-in-out;
+    }
+
+    button:hover {
+      background-color: #319795;
+    }
+
+    #resultado {
+      margin-top: 24px;
+      padding: 16px;
+      border-radius: 10px;
+      font-size: 16px;
+      transition: all 0.2s ease;
+    }
+
+    .erro {
+      background-color: var(--cor-erro);
+      color: white;
+    }
+
+    .sucesso {
+      background-color: var(--cor-sucesso);
+      color: var(--cor-secundaria);
+    }
+
+    ul {
+      list-style-type: none;
+      padding-left: 0;
+      margin-top: 10px;
+    }
+
+    li {
+      background-color: var(--cor-realce);
+      padding: 10px 14px;
+      border-radius: 8px;
+      margin-bottom: 8px;
+      color: var(--cor-texto);
+      font-weight: 500;
+    }
+
+    option:disabled {
+      color: #aaa;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Preços Praticados - Governo Federal</h2>
+
+    <label for="busca">🔍 Buscar item (mínimo 3 letras):</label>
+    <input type="text" id="busca" placeholder="Ex: papel, caneta, 626816" oninput="buscarItens()" />
+
+    <label for="combo">📋 Resultados da busca:</label>
+    <select id="combo">
+      <option disabled selected>Digite para buscar um item...</option>
+    </select>
+
+    <button onclick="buscarPreco()">Consultar Preço</button>
+
+    <div id="resultado"></div>
+  </div>
+
+  <script>
+    async function buscarItens() {
+      const termo = document.getElementById("busca").value;
+      const combo = document.getElementById("combo");
+      combo.innerHTML = "";
+
+      if (termo.length < 3) {
+        const opt = document.createElement("option");
+        opt.textContent = "Digite pelo menos 3 letras...";
+        opt.disabled = true;
+        opt.selected = true;
+        combo.appendChild(opt);
+        return;
+      }
+
+      try {
+        const resp = await fetch(`/buscar?q=${encodeURIComponent(termo)}`);
+        const itens = await resp.json();
+
+        if (itens.length === 0) {
+          const opt = document.createElement("option");
+          opt.textContent = "Nenhum item encontrado.";
+          opt.disabled = true;
+          opt.selected = true;
+          combo.appendChild(opt);
+          return;
+        }
+
+        itens.forEach(item => {
+          const opt = document.createElement("option");
+          opt.value = item.codigo;
+          opt.textContent = `${item.codigo} - ${item.descricao}`;
+          combo.appendChild(opt);
+        });
+      } catch (error) {
+        const opt = document.createElement("option");
+        opt.textContent = "Erro ao buscar itens.";
+        opt.disabled = true;
+        opt.selected = true;
+        combo.appendChild(opt);
+      }
+    }
+
+    async function buscarPreco() {
+  const codigo = document.getElementById("combo").value;
+  const resultadoEl = document.getElementById("resultado");
+
+  if (!codigo) {
+    resultadoEl.innerText = "Selecione um item válido.";
+    resultadoEl.className = "erro";
+    return;
+  }
+
+  resultadoEl.innerText = "Consultando...";
+  resultadoEl.className = "";
+
+  try {
+    const resp = await fetch(`/preco/${codigo}`);
+    const json = await resp.json();
+
+    if (Array.isArray(json) && json.length > 0) {
+      resultadoEl.className = "sucesso";
+      resultadoEl.innerHTML = `<strong>💰 Preços encontrados:</strong><ul>
+        ${json
+          .map(item => `
+            <li>
+              <strong>Preço Unitário:</strong> R$ ${item.precoUnitario.toFixed(2).replace(".", ",")}<br>
+              <strong>Unidade:</strong> ${item.nomeUnidadeFornecimento || "N/A"}<br>
+              <strong>Marca:</strong> ${item.marca || "N/A"}<br>
+              <strong>Estado:</strong> ${item.estado || "N/A"}
+            </li>
+          `)
+          .join("")}
+      </ul>`;
+    } else {
+      resultadoEl.innerText = `❌ Nenhum preço encontrado.`;
+      resultadoEl.className = "erro";
+    }
+  } catch (error) {
+    console.error("Erro:", error);
+    resultadoEl.innerText = "Erro ao consultar o preço.";
+    resultadoEl.className = "erro";
+  }
+}
+</script>
+</body>
+</html>
