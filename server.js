@@ -74,9 +74,10 @@ app.get("/buscar", (req, res) => {
   res.json(resultados.slice(0, 50));
 });
 
-// Rota para buscar todos os preços do item
+// Rota para buscar todos os preços do item com filtro por ano
 app.get("/preco/:codigo", async (req, res) => {
   const codigoItemCatalogo = req.params.codigo;
+  const anoFiltro = req.query.ano; // <- parâmetro opcional
   const API_URL = "https://dadosabertos.compras.gov.br/modulo-pesquisa-preco/1_consultarMaterial";
   const TOKEN = "3db72f4ebfecf6ba8ce3c867270fd86d"; // Em produção, use variável de ambiente
 
@@ -87,35 +88,78 @@ app.get("/preco/:codigo", async (req, res) => {
         "Accept": "*/*"
       },
       params: {
-        tamanhoPagina: 10,
+        tamanhoPagina: 100,
         codigoItemCatalogo
       }
     });
 
-    const resultados = response.data.resultado || [];
+    let resultados = response.data.resultado || [];
 
     if (resultados.length === 0) {
       return res.status(404).json({ erro: "Nenhum preço encontrado para o item informado." });
     }
 
+    // Filtrar por ano, se informado
+    if (anoFiltro) {
+      resultados = resultados.filter(r => {
+      const data = new Date(r.dataCompra);
+      const ano = data.getFullYear().toString();
+      //console.log(`${ano}`);
+      return ano === anoFiltro;
+      });
+    }
+
+
+    if (resultados.length === 0) {
+      return res.status(404).json({ erro: "Nenhum resultado encontrado para o ano informado." });
+    }
+
+    const formatarReal = valor => `R$ ${valor.toFixed(2).replace('.', ',')}`;
+
     const precos = resultados.map(r => ({
-      precoUnitario: r.precoUnitario || 0,
-      nomeUnidadeFornecimento: r.nomeUnidadeFornecimento || 0,
-      marca: r.marca || 0,
-      estado: r.estado || 0
-      
+      precoUnitario: formatarReal(r.precoUnitario || 0),
+      nomeUnidadeFornecimento: r.nomeUnidadeFornecimento || "N/A",
+      marca: r.marca || "N/A",
+      estado: r.estado || "N/A",
+      dataCompra: r.dataCompra || "N/A"
     }));
 
-    // Exibir os preços no console
-    //console.log(precos);
+    const valoresNumericos = resultados
+      .map(r => r.precoUnitario)
+      .filter(v => typeof v === "number" && !isNaN(v));
 
+    const soma = valoresNumericos.reduce((acc, val) => acc + val, 0);
+    const media = valoresNumericos.length ? soma / valoresNumericos.length : 0;
 
-    res.json(precos);
+    const valoresOrdenados = [...valoresNumericos].sort((a, b) => a - b);
+    let mediana = 0;
+    const meio = Math.floor(valoresOrdenados.length / 2);
+    if (valoresOrdenados.length % 2 === 0) {
+      mediana = (valoresOrdenados[meio - 1] + valoresOrdenados[meio]) / 2;
+    } else {
+      mediana = valoresOrdenados[meio];
+    }
+
+    const minimo = Math.min(...valoresNumericos);
+    const maximo = Math.max(...valoresNumericos);
+
+    res.json({
+      estatisticas: {
+        media: formatarReal(media),
+        mediana: formatarReal(mediana),
+        minimo: formatarReal(minimo),
+        maximo: formatarReal(maximo),
+        anoFiltrado: anoFiltro || "Todos"
+      },
+      dados: precos
+    });
+
   } catch (error) {
     console.error("Erro ao consultar API:", error.message);
     res.status(500).json({ erro: "Erro ao consultar a API externa." });
   }
 });
+
 
 // ============================
 // 4. INICIAR SERVIDOR
