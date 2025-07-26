@@ -29,7 +29,7 @@
     body {
       background-color: var(--cor-fundo);
       display: flex;
-      justify-content: center;
+      flex-direction: column;
       align-items: center;
       min-height: 100vh;
       padding: 20px;
@@ -128,6 +128,13 @@
     option:disabled {
       color: #aaa;
     }
+
+    footer {
+      text-align: center;
+      margin-top: 24px;
+      font-size: 14px;
+      color: #888;
+    }
   </style>
 </head>
 <body>
@@ -153,6 +160,10 @@
 
     <div id="resultado"></div>
   </div>
+
+  <footer>
+    © 2025 Desenvolvido por Marcelo Souza
+  </footer>
 
   <script>
     let estatisticasRelatorio = null;
