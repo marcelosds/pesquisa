@@ -270,47 +270,55 @@
       }
     }
 
-    function gerarRelatorio() {
-      if (!estatisticasRelatorio) {
-        alert("Consulte os preços antes de gerar o relatório.");
-        return;
-      }
+  function gerarRelatorio() {
+  if (!estatisticasRelatorio) {
+    alert("Consulte os preços antes de gerar o relatório.");
+    return;
+  }
 
-      const { jsPDF } = window.jspdf;
-      const doc = new jsPDF({ orientation: "portrait" });
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: "landscape" });
 
-      const titulo = "Preços Praticados - Governo Federal";
-      const hoje = new Date().toLocaleDateString("pt-BR");
+  const titulo = "Preços Praticados - Governo Federal";
+  const hoje = new Date().toLocaleDateString("pt-BR");
 
-      doc.setFontSize(16);
-      doc.text(titulo, 105, 20, { align: "center" });
+  doc.setFontSize(16);
+  doc.text(titulo, 148.5, 20, { align: "center" });
 
-      doc.setFontSize(12);
+  doc.setFontSize(10);
+  const descricao = doc.splitTextToSize(`Item: ${descricaoSelecionada}`, 270);
 
-      // Quebra de linha na descrição se for muito longa
-      const descricao = doc.splitTextToSize(`Item: ${descricaoSelecionada}`, 180);
-      doc.text(descricao, 15, 35);
-
-      const tableData = [
-        ["Preço Médio", estatisticasRelatorio.media],
-        ["Mediana", estatisticasRelatorio.mediana],
-        ["Preço Mínimo", estatisticasRelatorio.minimo],
-        ["Preço Máximo", estatisticasRelatorio.maximo]
-      ];
-
-      doc.autoTable({
-        startY: 45 + (descricao.length - 1) * 7, // move a tabela para baixo conforme número de linhas da descrição
-        head: [["Indicador", "Valor"]],
-        body: tableData,
-        styles: { halign: 'center' },
-        headStyles: { fillColor: [56, 178, 172] },
-      });
-
-      doc.setFontSize(10);
-      doc.text(`Data da geração do relatório: ${hoje}`, 15, doc.internal.pageSize.height - 10);
-
-      doc.save("relatorio_precos.pdf");
+  doc.autoTable({
+    startY: 20 + (descricao.length - 1) * 7,
+    head: [["Descrição do Item", "Preço Médio", "Mediana", "Preço Mínimo", "Preço Máximo"]],
+    body: [[
+      descricaoSelecionada,
+      estatisticasRelatorio.media,
+      estatisticasRelatorio.mediana,
+      estatisticasRelatorio.minimo,
+      estatisticasRelatorio.maximo
+    ]],
+    styles: {
+      fontSize: 10,
+      lineWidth: 0.1,
+      lineColor: [0, 0, 0],
+      halign: 'center'
+    },
+    headStyles: { fillColor: [56, 178, 172] },
+    columnStyles: {
+      0: { cellWidth: 150, halign: 'left', valign: 'middle' }, // descrição
+      1: { cellWidth: 'auto', halign: 'center', valign: 'middle' }, // preço médio
+      2: { cellWidth: 'auto', halign: 'center', valign: 'middle' }, // mediana
+      3: { cellWidth: 'auto', halign: 'center', valign: 'middle' }, // mínimo
+      4: { cellWidth: 'auto', halign: 'center', valign: 'middle' }  // máximo
     }
-  </script>
+  });
+
+  doc.setFontSize(10);
+  doc.text(`Data da Geração do Relatório: ${hoje}`, 15, doc.internal.pageSize.height - 10);
+
+  doc.save("relatorio_precos.pdf");
+}
+</script>
 </body>
 </html>
