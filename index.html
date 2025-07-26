@@ -74,17 +74,6 @@
       outline: none;
     }
 
-    select {
-      white-space: normal;
-      overflow-wrap: break-word;
-    }
-
-    select option {
-      white-space: normal;
-      word-break: break-word;
-      line-height: 1.4;
-    }
-
     button {
       background-color: var(--cor-primaria);
       color: white;
@@ -131,6 +120,11 @@
       font-weight: 500;
     }
 
+    select option {
+      white-space: normal;
+      word-break: break-word;
+    }
+
     option:disabled {
       color: #aaa;
     }
@@ -144,8 +138,8 @@
     <input type="text" id="busca" placeholder="Ex: papel, caneta, 626816" oninput="buscarItens()" />
 
     <label for="combo">📋 Resultados da busca:</label>
-    <select id="combo" size="6" style="white-space: normal;">
-      <option disabled selected>...</option>
+    <select id="combo" size="6" multiple>
+      <option disabled>...</option>
     </select>
 
     <label for="ano">📅 Ano da Compra:</label>
@@ -201,35 +195,50 @@
 
     async function buscarPreco() {
       const combo = document.getElementById("combo");
-      const codigo = combo.value;
+      const selecionados = Array.from(combo.selectedOptions).map(opt => opt.value);
       const ano = document.getElementById("ano").value;
       const resultadoEl = document.getElementById("resultado");
 
-      if (!codigo) {
-        resultadoEl.innerText = "Selecione um item válido.";
+      if (selecionados.length === 0) {
+        resultadoEl.innerText = "Selecione pelo menos um item válido.";
         resultadoEl.className = "erro";
         return;
       }
-
-      descricaoSelecionada = combo.options[combo.selectedIndex].textContent;
 
       resultadoEl.innerText = "Consultando...";
       resultadoEl.className = "";
 
       try {
-        const resp = await fetch(`/preco/${codigo}?ano=${ano}`);
-        const json = await resp.json();
+        let todosDados = [];
+        let descricoesSelecionadas = [];
 
-        if (json.dados && json.dados.length > 0) {
-          resultadoEl.className = "sucesso";
-          estatisticasRelatorio = json.estatisticas;
+        for (const codigo of selecionados) {
+          const resp = await fetch(`/preco/${codigo}?ano=${ano}`);
+          const json = await resp.json();
 
-          const estat = json.estatisticas;
-          const lista = json.dados;
+          if (json.dados && json.dados.length > 0) {
+            const option = Array.from(combo.options).find(o => o.value === codigo);
+            const descricao = option ? option.textContent.split(" - ").slice(1).join(" - ") : codigo;
 
-          resultadoEl.innerHTML = `
-            <div style="margin-bottom:16px;">
-              <strong>📊 Estatísticas Apuradas:</strong><br><br>
+            todosDados.push({ codigo, descricao, estatisticas: json.estatisticas });
+            descricoesSelecionadas.push(`${codigo} - ${descricao}`);
+          }
+        }
+
+        if (todosDados.length === 0) {
+          resultadoEl.innerText = "❌ Nenhum preço encontrado para os itens selecionados.";
+          resultadoEl.className = "erro";
+          return;
+        }
+
+        descricaoSelecionada = descricoesSelecionadas.join(", ");
+
+        let html = `<strong>📊 Estatísticas Apuradas:</strong><br><br>`;
+        todosDados.forEach(item => {
+          const estat = item.estatisticas;
+          html += `
+            <div style="margin-bottom: 12px; padding: 10px 14px; background-color: var(--cor-realce); border-radius: 8px;">
+              <strong>${item.codigo} - ${item.descricao}</strong><br><br>
               <div style="display:flex; justify-content: space-between;">
                 <span>Preço Médio: <strong>${estat.media}</strong></span>
                 <span>Preço Mínimo: <strong>${estat.minimo}</strong></span>
@@ -238,31 +247,22 @@
                 <span style="text-align: right;">Mediana: <strong>${estat.mediana}</strong></span>
                 <span style="text-align: right;">Preço Máximo: <strong>${estat.maximo}</strong></span>
               </div>
-              <div style="margin-top:8px;">
-                <small>Ano filtrado: <strong>${estat.anoFiltrado || ano}</strong></small>
-              </div>
-            </div><br>
-
-            <strong>💰 Preços encontrados:</strong>
-            <ul>
-              ${lista.map(item => `
-                <li>
-                  <strong>Preço Unitário:</strong> ${item.precoUnitario}<br>
-                  <strong>Unidade:</strong> ${item.nomeUnidadeFornecimento || "N/A"}<br>
-                  <strong>Marca:</strong> ${item.marca || "N/A"}<br>
-                  <strong>Estado:</strong> ${item.estado || "N/A"}<br>
-                  <strong>Data da Compra:</strong> ${item.dataCompra
-                    ? new Date(item.dataCompra).toLocaleDateString('pt-BR')
-                    : "N/A"}
-                </li>
-              `).join("")}
-            </ul>
+            </div>
           `;
-        } else {
-          estatisticasRelatorio = null;
-          resultadoEl.innerText = json.erro || "❌ Nenhum preço encontrado.";
-          resultadoEl.className = "erro";
-        }
+        });
+        html += `<br><small>Ano filtrado: <strong>${ano}</strong></small>`;
+
+        resultadoEl.innerHTML = html;
+        resultadoEl.className = "sucesso";
+
+        estatisticasRelatorio = todosDados.map(item => ({
+          descricao: `${item.codigo} - ${item.descricao}`,
+          media: item.estatisticas.media,
+          mediana: item.estatisticas.mediana,
+          minimo: item.estatisticas.minimo,
+          maximo: item.estatisticas.maximo
+        }));
+
       } catch (err) {
         estatisticasRelatorio = null;
         resultadoEl.innerText = "Erro ao consultar o preço.";
@@ -270,55 +270,56 @@
       }
     }
 
-  function gerarRelatorio() {
-  if (!estatisticasRelatorio) {
-    alert("Consulte os preços antes de gerar o relatório.");
-    return;
-  }
+    function gerarRelatorio() {
+      if (!estatisticasRelatorio) {
+        alert("Consulte os preços antes de gerar o relatório.");
+        return;
+      }
 
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ orientation: "landscape" });
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF({ orientation: "landscape" });
+      const hoje = new Date().toLocaleDateString("pt-BR");
 
-  const titulo = "Preços Praticados - Governo Federal";
-  const hoje = new Date().toLocaleDateString("pt-BR");
+      doc.setFontSize(16);
+      doc.text("Preços Praticados - Governo Federal", 148.5, 20, { align: "center" });
 
-  doc.setFontSize(16);
-  doc.text(titulo, 148.5, 20, { align: "center" });
+      doc.setFontSize(10);
+      const descricao = doc.splitTextToSize(`Itens selecionados: ${descricaoSelecionada}`, 270);
 
-  doc.setFontSize(10);
-  const descricao = doc.splitTextToSize(`Item: ${descricaoSelecionada}`, 270);
+      const body = estatisticasRelatorio.map(item => [
+        item.descricao,
+        item.media,
+        item.mediana,
+        item.minimo,
+        item.maximo
+      ]);
 
-  doc.autoTable({
-    startY: 20 + (descricao.length - 1) * 7,
-    head: [["Descrição do Item", "Preço Médio", "Mediana", "Preço Mínimo", "Preço Máximo"]],
-    body: [[
-      descricaoSelecionada,
-      estatisticasRelatorio.media,
-      estatisticasRelatorio.mediana,
-      estatisticasRelatorio.minimo,
-      estatisticasRelatorio.maximo
-    ]],
-    styles: {
-      fontSize: 10,
-      lineWidth: 0.1,
-      lineColor: [0, 0, 0],
-      halign: 'center'
-    },
-    headStyles: { fillColor: [56, 178, 172] },
-    columnStyles: {
-      0: { cellWidth: 150, halign: 'left', valign: 'middle' }, // descrição
-      1: { cellWidth: 'auto', halign: 'center', valign: 'middle' }, // preço médio
-      2: { cellWidth: 'auto', halign: 'center', valign: 'middle' }, // mediana
-      3: { cellWidth: 'auto', halign: 'center', valign: 'middle' }, // mínimo
-      4: { cellWidth: 'auto', halign: 'center', valign: 'middle' }  // máximo
+      doc.autoTable({
+        startY: 15 + (descricao.length - 1) * 7,
+        head: [["Descrição do Item", "Preço Médio", "Mediana", "Preço Mínimo", "Preço Máximo"]],
+        body: body,
+        styles: {
+          fontSize: 10,
+          lineWidth: 0.1,
+          lineColor: [0, 0, 0],
+          halign: 'center',
+          valign: 'middle'
+        },
+        headStyles: { fillColor: [56, 178, 172] },
+        columnStyles: {
+          0: { cellWidth: 150, halign: 'left' },
+          1: { cellWidth: 'auto' },
+          2: { cellWidth: 'auto' },
+          3: { cellWidth: 'auto' },
+          4: { cellWidth: 'auto' }
+        }
+      });
+
+      doc.setFontSize(10);
+      doc.text(`Data da Geração do Relatório: ${hoje}`, 15, doc.internal.pageSize.height - 10);
+
+      doc.save("relatorio_precos.pdf");
     }
-  });
-
-  doc.setFontSize(10);
-  doc.text(`Data da Geração do Relatório: ${hoje}`, 15, doc.internal.pageSize.height - 10);
-
-  doc.save("relatorio_precos.pdf");
-}
-</script>
+  </script>
 </body>
 </html>
