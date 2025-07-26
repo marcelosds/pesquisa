@@ -4,6 +4,8 @@
   <meta charset="UTF-8" />
   <title>Consulta de Preço - Governo Federal</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
   <style>
     :root {
       --cor-primaria: #38b2ac;
@@ -40,7 +42,6 @@
       box-shadow: 0 10px 30px rgba(0, 0, 0, 0.06);
       max-width: 600px;
       width: 100%;
-      transition: all 0.3s ease-in-out;
     }
 
     h2 {
@@ -58,9 +59,7 @@
       color: var(--cor-texto);
     }
 
-    input,
-    select,
-    button {
+    input, select, button {
       width: 100%;
       padding: 12px 14px;
       font-size: 16px;
@@ -69,16 +68,21 @@
       transition: border 0.2s, box-shadow 0.2s;
     }
 
-    input:focus,
-    select:focus {
+    input:focus, select:focus {
       border-color: var(--cor-primaria);
       box-shadow: 0 0 0 3px rgba(56, 178, 172, 0.2);
       outline: none;
     }
 
+    select {
+      white-space: normal;
+      overflow-wrap: break-word;
+    }
+
     select option {
-      white-space: pre-wrap;
-      line-height: 1.3;
+      white-space: normal;
+      word-break: break-word;
+      line-height: 1.4;
     }
 
     button {
@@ -100,7 +104,6 @@
       padding: 16px;
       border-radius: 10px;
       font-size: 16px;
-      transition: all 0.2s ease;
     }
 
     .erro {
@@ -141,7 +144,7 @@
     <input type="text" id="busca" placeholder="Ex: papel, caneta, 626816" oninput="buscarItens()" />
 
     <label for="combo">📋 Resultados da busca:</label>
-    <select id="combo" size="6">
+    <select id="combo" size="6" style="white-space: normal;">
       <option disabled selected>...</option>
     </select>
 
@@ -152,22 +155,22 @@
     </select>
 
     <button onclick="buscarPreco()">Consultar Preço</button>
+    <button onclick="gerarRelatorio()">📄 Gerar Relatório - PDF</button>
 
     <div id="resultado"></div>
   </div>
 
   <script>
+    let estatisticasRelatorio = null;
+    let descricaoSelecionada = "";
+
     async function buscarItens() {
       const termo = document.getElementById("busca").value;
       const combo = document.getElementById("combo");
       combo.innerHTML = "";
 
       if (termo.length < 3) {
-        const opt = document.createElement("option");
-        opt.textContent = "Digite pelo menos 3 letras...";
-        opt.disabled = true;
-        opt.selected = true;
-        combo.appendChild(opt);
+        combo.innerHTML = `<option disabled selected>Digite pelo menos 3 letras...</option>`;
         return;
       }
 
@@ -176,11 +179,7 @@
         const itens = await resp.json();
 
         if (itens.length === 0) {
-          const opt = document.createElement("option");
-          opt.textContent = "Nenhum item encontrado.";
-          opt.disabled = true;
-          opt.selected = true;
-          combo.appendChild(opt);
+          combo.innerHTML = `<option disabled selected>Nenhum item encontrado.</option>`;
           return;
         }
 
@@ -196,91 +195,122 @@
           combo.appendChild(separador);
         });
       } catch (error) {
-        const opt = document.createElement("option");
-        opt.textContent = "Erro ao buscar itens.";
-        opt.disabled = true;
-        opt.selected = true;
-        combo.appendChild(opt);
+        combo.innerHTML = `<option disabled selected>Erro ao buscar itens.</option>`;
       }
     }
 
     async function buscarPreco() {
-  const codigo = document.getElementById("combo").value;
-  const ano = document.getElementById("ano").value;
-  const resultadoEl = document.getElementById("resultado");
+      const combo = document.getElementById("combo");
+      const codigo = combo.value;
+      const ano = document.getElementById("ano").value;
+      const resultadoEl = document.getElementById("resultado");
 
-  if (!codigo) {
-    resultadoEl.innerText = "Selecione um item válido.";
-    resultadoEl.className = "erro";
-    return;
-  }
+      if (!codigo) {
+        resultadoEl.innerText = "Selecione um item válido.";
+        resultadoEl.className = "erro";
+        return;
+      }
 
-  resultadoEl.innerText = "Consultando...";
-  resultadoEl.className = "";
+      descricaoSelecionada = combo.options[combo.selectedIndex].textContent;
 
-  try {
-    const resp = await fetch(`/preco/${codigo}?ano=${ano}`);
-    if (!resp.ok) {
-      const errJson = await resp.json().catch(() => null);
-      console.error("Backend retornou erro:", resp.status, errJson);
-      throw new Error(`Erro no backend: ${resp.status}`);
+      resultadoEl.innerText = "Consultando...";
+      resultadoEl.className = "";
+
+      try {
+        const resp = await fetch(`/preco/${codigo}?ano=${ano}`);
+        const json = await resp.json();
+
+        if (json.dados && json.dados.length > 0) {
+          resultadoEl.className = "sucesso";
+          estatisticasRelatorio = json.estatisticas;
+
+          const estat = json.estatisticas;
+          const lista = json.dados;
+
+          resultadoEl.innerHTML = `
+            <div style="margin-bottom:16px;">
+              <strong>📊 Estatísticas Apuradas:</strong><br><br>
+              <div style="display:flex; justify-content: space-between;">
+                <span>Preço Médio: <strong>${estat.media}</strong></span>
+                <span>Preço Mínimo: <strong>${estat.minimo}</strong></span>
+              </div>
+              <div style="display:flex; justify-content: space-between;">
+                <span style="text-align: right;">Mediana: <strong>${estat.mediana}</strong></span>
+                <span style="text-align: right;">Preço Máximo: <strong>${estat.maximo}</strong></span>
+              </div>
+              <div style="margin-top:8px;">
+                <small>Ano filtrado: <strong>${estat.anoFiltrado || ano}</strong></small>
+              </div>
+            </div><br>
+
+            <strong>💰 Preços encontrados:</strong>
+            <ul>
+              ${lista.map(item => `
+                <li>
+                  <strong>Preço Unitário:</strong> ${item.precoUnitario}<br>
+                  <strong>Unidade:</strong> ${item.nomeUnidadeFornecimento || "N/A"}<br>
+                  <strong>Marca:</strong> ${item.marca || "N/A"}<br>
+                  <strong>Estado:</strong> ${item.estado || "N/A"}<br>
+                  <strong>Data da Compra:</strong> ${item.dataCompra
+                    ? new Date(item.dataCompra).toLocaleDateString('pt-BR')
+                    : "N/A"}
+                </li>
+              `).join("")}
+            </ul>
+          `;
+        } else {
+          estatisticasRelatorio = null;
+          resultadoEl.innerText = json.erro || "❌ Nenhum preço encontrado.";
+          resultadoEl.className = "erro";
+        }
+      } catch (err) {
+        estatisticasRelatorio = null;
+        resultadoEl.innerText = "Erro ao consultar o preço.";
+        resultadoEl.className = "erro";
+      }
     }
 
-    const json = await resp.json();
-    console.log("Resposta JSON:", json);
+    function gerarRelatorio() {
+      if (!estatisticasRelatorio) {
+        alert("Consulte os preços antes de gerar o relatório.");
+        return;
+      }
 
-    if (json.dados && json.dados.length > 0) {
-      resultadoEl.className = "sucesso";
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF({ orientation: "portrait" });
 
-      const estat = json.estatisticas;
-      const lista = json.dados;
+      const titulo = "Preços Praticados - Governo Federal";
+      const hoje = new Date().toLocaleDateString("pt-BR");
 
-      const estatisticasHTML = `
-        <div style="margin-bottom:16px;">
-          <strong>📊 Estatísticas Apuradas:</strong><br><br>
-          <div style="display:flex; justify-content: space-between;">
-            <span>Preço Médio: <strong>${estat.media}</strong></span>
-            <span>Preço Mínimo: <strong>${estat.minimo}</strong></span>
-          </div>
-          <div style="display:flex; justify-content: space-between;">
-            <span style="text-align: right;">Mediana: <strong>${estat.mediana}</strong></span>
-            <span style="text-align: right;">Preço Máximo: <strong>${estat.maximo}</strong></span>
-          </div>
-          <div style="margin-top:8px;">
-            <small>Ano filtrado: <strong>${estat.anoFiltrado || ano}</strong></small>
-          </div>
-        </div><br>
-      `;
+      doc.setFontSize(16);
+      doc.text(titulo, 105, 20, { align: "center" });
 
-      const listaHTML = `
-        <strong>💰 Preços encontrados:</strong>
-        <ul>
-          ${lista.map(item => `
-            <li>
-              <strong>Preço Unitário:</strong> ${item.precoUnitario}<br>
-              <strong>Unidade:</strong> ${item.nomeUnidadeFornecimento || "N/A"}<br>
-              <strong>Marca:</strong> ${item.marca || "N/A"}<br>
-              <strong>Estado:</strong> ${item.estado || "N/A"}<br>
-              <strong>Data da Compra:</strong> ${item.dataCompra
-                ? new Date(item.dataCompra).toLocaleDateString('pt-BR')
-                : "N/A"}
-            </li>
-          `).join("")}
-        </ul>
-      `;
+      doc.setFontSize(12);
 
-      resultadoEl.innerHTML = estatisticasHTML + listaHTML;
+      // Quebra de linha na descrição se for muito longa
+      const descricao = doc.splitTextToSize(`Item: ${descricaoSelecionada}`, 180);
+      doc.text(descricao, 15, 35);
 
-    } else {
-      resultadoEl.innerText = json.erro || "❌ Nenhum preço encontrado.";
-      resultadoEl.className = "erro";
+      const tableData = [
+        ["Preço Médio", estatisticasRelatorio.media],
+        ["Mediana", estatisticasRelatorio.mediana],
+        ["Preço Mínimo", estatisticasRelatorio.minimo],
+        ["Preço Máximo", estatisticasRelatorio.maximo]
+      ];
+
+      doc.autoTable({
+        startY: 45 + (descricao.length - 1) * 7, // move a tabela para baixo conforme número de linhas da descrição
+        head: [["Indicador", "Valor"]],
+        body: tableData,
+        styles: { halign: 'center' },
+        headStyles: { fillColor: [56, 178, 172] },
+      });
+
+      doc.setFontSize(10);
+      doc.text(`Data da geração do relatório: ${hoje}`, 15, doc.internal.pageSize.height - 10);
+
+      doc.save("relatorio_precos.pdf");
     }
-  } catch (err) {
-    console.error("Erro buscarPreco:", err);
-    resultadoEl.innerText = "Erro ao consultar o preço.";
-    resultadoEl.className = "erro";
-  }
-}
-</script>
+  </script>
 </body>
 </html>
