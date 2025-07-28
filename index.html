@@ -1,9 +1,8 @@
-<!-- 🟢 CÓDIGO HTML COMPLETO COM AJUSTE NO PDF GERADO -->
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
-  <title>Consulta de Preço - Governo Federal</title>
+  <title>Consulta de Preço - Compras.gov.br</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
@@ -55,38 +54,12 @@
       border-radius: 10px;
       font-size: 16px;
     }
-    .erro {
-      background-color: var(--cor-erro);
-      color: white;
-    }
-    .sucesso {
-      background-color: var(--cor-sucesso);
-      color: var(--cor-secundaria);
-    }
-    footer {
-      text-align: center;
-      margin-top: 24px;
-      font-size: 14px;
-      color: #888;
-    }
-    #paginacao {
-      margin-top: 12px;
-      text-align: center;
-    }
-    #paginacao button {
-      width: auto;
-      padding: 6px 12px;
-      margin: 0 4px;
-      font-size: 14px;
-    }
-    #comboContainer {
-      max-height: 240px;
-      overflow-y: auto;
-      border: 1px solid var(--borda);
-      border-radius: 10px;
-      padding: 8px;
-      background-color: var(--cor-branca);
-    }
+    .erro { background-color: var(--cor-erro); color: white; }
+    .sucesso { background-color: var(--cor-sucesso); color: var(--cor-secundaria); }
+    footer { text-align: center; margin-top: 24px; font-size: 14px; color: #888; }
+    #paginacao { margin-top: 12px; text-align: center; }
+    #paginacao button { width: auto; padding: 6px 12px; margin: 0 4px; font-size: 14px; }
+    #comboContainer { max-height: 240px; overflow-y: auto; border: 1px solid var(--borda); border-radius: 10px; padding: 8px; background-color: var(--cor-branca); }
   </style>
 </head>
 <body>
@@ -98,7 +71,6 @@
 
     <label for="comboContainer">📋 Resultados da busca:</label>
     <div id="comboContainer" aria-label="Resultados da busca" role="listbox"></div>
-
     <div id="paginacao"></div>
 
     <label for="ano">📅 Ano da Compra:</label>
@@ -123,124 +95,91 @@
 
   async function buscarItens() {
     const termo = document.getElementById("busca").value.trim();
-    const comboContainer = document.getElementById("comboContainer");
+    const combo = document.getElementById("comboContainer");
     document.getElementById("paginacao").innerHTML = "";
-    comboContainer.innerHTML = "";
+    combo.innerHTML = "";
     selecionados.clear();
     if (termo.length < 3) {
-      comboContainer.innerHTML = '<div style="color:#aaa; padding: 8px;">Digite pelo menos 3 letras...</div>';
+      combo.innerHTML = '<div style="color:#aaa; padding:8px;">Digite pelo menos 3 letras...</div>';
       return;
     }
     try {
       const resp = await fetch(`/buscar?q=${encodeURIComponent(termo)}`);
       const itens = await resp.json();
       if (!itens || itens.length === 0) {
-        comboContainer.innerHTML = '<div style="color:#aaa; padding: 8px;">Nenhum item encontrado.</div>';
+        combo.innerHTML = '<div style="color:#aaa; padding:8px;">Nenhum item encontrado.</div>';
         return;
       }
       resultadosBusca = itens.sort((a,b) => a.descricao.localeCompare(b.descricao, 'pt-BR', {sensitivity:'base'}));
       paginaAtual = 1;
       exibirPagina();
     } catch {
-      comboContainer.innerHTML = '<div style="color:#e74c3c; padding: 8px;">Erro ao buscar itens.</div>';
+      combo.innerHTML = '<div style="color:#e74c3c; padding:8px;">Erro ao buscar itens.</div>';
     }
   }
 
   function exibirPagina() {
-    const comboContainer = document.getElementById("comboContainer");
+    const combo = document.getElementById("comboContainer");
     const pag = document.getElementById("paginacao");
-    comboContainer.innerHTML = ""; 
-    pag.innerHTML = "";
+    combo.innerHTML = ""; pag.innerHTML = "";
 
-    const totalPaginas = Math.ceil(resultadosBusca.length / itensPorPagina);
+    const total = Math.ceil(resultadosBusca.length / itensPorPagina);
     const inicio = (paginaAtual - 1) * itensPorPagina;
     const fim = inicio + itensPorPagina;
 
-    const paginaItens = resultadosBusca.slice(inicio, fim)
-      .sort((a,b) => a.descricao.localeCompare(b.descricao, 'pt-BR', {sensitivity:'base'}));
+    resultadosBusca.slice(inicio, fim).sort((a,b) => a.descricao.localeCompare(b.descricao,'pt-BR',{sensitivity:'base'}))
+      .forEach(item => {
+        const wrapper = document.createElement("div"); wrapper.style.display="flex";
+        const chk = document.createElement("input"); chk.type="checkbox";
+        chk.value = item.codigo; chk.checked = selecionados.has(item.codigo);
+        chk.style.marginRight = "8px"; chk.id = "chk_"+item.codigo;
+        chk.onchange = e => e.target.checked ? selecionados.add(item.codigo) : selecionados.delete(item.codigo);
+        const label = document.createElement("label");
+        label.htmlFor = chk.id; label.innerHTML = `<strong>${item.codigo}</strong> - ${item.descricao}`;
+        label.style.color="var(--cor-texto)"; label.style.cursor="pointer";
+        wrapper.appendChild(chk); wrapper.appendChild(label);
+        combo.appendChild(wrapper);
+        const spacer = document.createElement("div"); spacer.style.height="6px";
+        combo.appendChild(spacer);
+      });
 
-    paginaItens.forEach(item => {
-      const wrapper = document.createElement("div");
-      wrapper.style.display = "flex";
-      wrapper.style.alignItems = "center";
-      wrapper.style.marginBottom = "6px";
-
-      const checkbox = document.createElement("input");
-      checkbox.type = "checkbox";
-      checkbox.value = item.codigo;
-      checkbox.checked = selecionados.has(item.codigo);
-      checkbox.style.marginRight = "8px";
-      checkbox.id = "chk_" + item.codigo;
-      checkbox.onchange = (e) => {
-        if (e.target.checked) {
-          selecionados.add(item.codigo);
-        } else {
-          selecionados.delete(item.codigo);
-        }
-      };
-
-      const label = document.createElement("label");
-      label.htmlFor = checkbox.id;
-      label.innerHTML = `<strong>${item.codigo}</strong> - ${item.descricao}`;
-      label.style.color = "var(--cor-texto)";
-      label.style.cursor = "pointer";
-
-      wrapper.appendChild(checkbox);
-      wrapper.appendChild(label);
-      comboContainer.appendChild(wrapper);
-
-      const spacer = document.createElement("div");
-      spacer.style.height = "6px";
-      comboContainer.appendChild(spacer);
-    });
-
-    if (totalPaginas > 1) {
-      const btnA = document.createElement("button");
-      btnA.textContent = "⬅️ Anterior"; 
-      btnA.disabled = paginaAtual === 1;
-      btnA.onclick = () => { paginaAtual--; exibirPagina(); };
-
-      const btnP = document.createElement("button");
-      btnP.textContent = "Próximo ➡️"; 
-      btnP.disabled = paginaAtual === totalPaginas;
-      btnP.onclick = () => { paginaAtual++; exibirPagina(); };
-
+    if (total > 1) {
+      const btnA = document.createElement("button"); btnA.textContent="⬅️ Anterior";
+      btnA.disabled = paginaAtual === 1; btnA.onclick = () => { paginaAtual--; exibirPagina(); };
+      const btnP = document.createElement("button"); btnP.textContent="Próximo ➡️";
+      btnP.disabled = paginaAtual===total; btnP.onclick = () => { paginaAtual++; exibirPagina(); };
       pag.appendChild(btnA);
-      pag.appendChild(document.createTextNode(` Página ${paginaAtual} de ${totalPaginas} `));
+      pag.appendChild(document.createTextNode(` Página ${paginaAtual} de ${total} `));
       pag.appendChild(btnP);
     }
   }
 
   async function buscarPreco() {
     const resultadoEl = document.getElementById("resultado");
-    const selecionadosArray = Array.from(selecionados);
-    if (selecionadosArray.length === 0) {
-      resultadoEl.innerText = "Selecione pelo menos um item válido.";
-      resultadoEl.className = "erro";
+    const cods = Array.from(selecionados);
+    if (cods.length === 0) {
+      resultadoEl.innerText = "Selecione pelo menos um item válido."; resultadoEl.className="erro";
       return;
     }
     const ano = document.getElementById("ano").value;
-    resultadoEl.className = "";
     try {
-      let todosDados = [], descricoesSelecionadas = [];
-      for (const codigo of selecionadosArray) {
+      let todosDados = [], descrs = [];
+      for (const codigo of cods) {
         const resp = await fetch(`/preco/${codigo}?ano=${ano}`);
         const json = await resp.json();
-        if (json.dados && json.dados.length > 0) {
-          const item = resultadosBusca.find(i => i.codigo === codigo);
+        if (json.dados && json.dados.length) {
+          const item = resultadosBusca.find(i=>i.codigo===codigo);
           const descr = item ? item.descricao : codigo;
-          todosDados.push({codigo, descricao: descr, estatisticas: json.estatisticas});
-          descricoesSelecionadas.push(`${codigo} - ${descr}`);
+          todosDados.push({codigo, descricao:descr, estatisticas: json.estatisticas});
+          descrs.push(`${codigo} - ${descr}`);
         }
       }
-      if (todosDados.length === 0) {
-        resultadoEl.innerText = "❌ Nenhum preço encontrado.";
-        resultadoEl.className = "erro";
+      if (!todosDados.length) {
+        resultadoEl.innerText = "❌ Nenhum preço encontrado."; resultadoEl.className="erro";
         return;
       }
-      descricaoSelecionada += (descricaoSelecionada ? ", " : "") + descricoesSelecionadas.join(", ");
-      let html = resultadoEl.innerHTML;
-      html += `<br><strong>📊 Estatísticas Apuradas:</strong><br><br>`;
+      descricaoSelecionada += (descricaoSelecionada ? ", " : "") + descrs.join(", ");
+      let html = resultadoEl.innerHTML || ""; html += `<br><strong>📊 Estatísticas Apuradas:</strong><br><br>`;
       todosDados.forEach(item => {
         const e = item.estatisticas;
         html += `<div style="margin-bottom:12px;padding:10px 14px;background-color:var(--cor-realce);border-radius:8px;">
@@ -250,74 +189,89 @@
             <span>Preço Mínimo: <strong>${e.minimo}</strong></span>
           </div>
           <div style="display:flex;justify-content:space-between;">
-            <span style="text-align:right;">Mediana: <strong>${e.mediana}</strong></span>
-            <span style="text-align:right;">Preço Máximo: <strong>${e.maximo}</strong></span>
+            <span>Mediana: <strong>${e.mediana}</strong></span>
+            <span>Preço Máximo: <strong>${e.maximo}</strong></span>
           </div>
         </div>`;
       });
       html += `<br><small>Ano filtrado: <strong>${ano}</strong></small>`;
-      resultadoEl.innerHTML = html;
-      resultadoEl.className = "sucesso";
-
+      resultadoEl.innerHTML = html; resultadoEl.className="sucesso";
       if (!estatisticasRelatorio) estatisticasRelatorio = [];
-      estatisticasRelatorio = estatisticasRelatorio.concat(
-        todosDados.map(item => ({
-          descricao: `${item.codigo} - ${item.descricao}`,
-          media: item.estatisticas.media,
-          mediana: item.estatisticas.mediana,
-          minimo: item.estatisticas.minimo,
-          maximo: item.estatisticas.maximo
-        }))
-      );
+      estatisticasRelatorio = estatisticasRelatorio.concat(todosDados.map(item=>({
+        descricao:`${item.codigo} - ${item.descricao}`,
+        media:item.estatisticas.media,
+        mediana:item.estatisticas.mediana,
+        minimo:item.estatisticas.minimo,
+        maximo:item.estatisticas.maximo
+      })));
     } catch {
       estatisticasRelatorio = null;
-      resultadoEl.innerText = "Erro ao consultar o preço.";
-      resultadoEl.className = "erro";
+      resultadoEl.innerText="Erro ao consultar o preço."; resultadoEl.className="erro";
     }
   }
 
   function gerarRelatorio() {
-    if (!estatisticasRelatorio) {
-      alert("Consulte os preços antes.");
-      return;
-    }
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF({ orientation: "landscape" });
-    const hoje = new Date().toLocaleDateString("pt-BR");
-
-    doc.setFontSize(16);
-    doc.text("Preços Praticados - Governo Federal", 148.5, 20, { align: "center" });
-
- 
-    // Tabela
-    const body = estatisticasRelatorio.map(item => [
-      item.descricao, item.media, item.mediana, item.minimo, item.maximo
-    ]);
-    doc.autoTable({
-      startY: 30,
-      head: [["Descrição do Item", "Preço Médio", "Mediana", "Preço Mínimo", "Preço Máximo"]],
-      body,
-      styles: { fontSize: 10, lineWidth: 0.1, lineColor: [0, 0, 0], halign: "center", valign: "middle" },
-      headStyles: { fillColor: [56, 178, 172] },
-      columnStyles: {
-        0: { cellWidth: 150, halign: "left" },
-        1: { cellWidth: "auto" },
-        2: { cellWidth: "auto" },
-        3: { cellWidth: "auto" },
-        4: { cellWidth: "auto" }
-      }
-    });
-
-    doc.setFontSize(10);
-    doc.text(`Data da Geração do Relatório: ${hoje}`, 15, doc.internal.pageSize.height - 10);
-    doc.save("relatorio_precos.pdf");
+  if (!estatisticasRelatorio || !estatisticasRelatorio.length) {
+    return alert("Consulte os preços antes.");
   }
 
-  function limparResultados() {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: "landscape" });
+  const hoje = new Date().toLocaleDateString("pt-BR");
+
+  // Logo Base64 incorporado (Brasão ou logo institucional)
+  if (logoBase64) {
+  doc.addImage(logoBase64, 'PNG', 10, 10, 25, 25);
+  }
+
+  doc.setFontSize(16);
+  doc.text("Preços Praticados - Compras Governamentais", 105, 20, { align: 'center' });
+
+  const body = estatisticasRelatorio.map(item => [
+    item.descricao,
+    item.media,
+    item.mediana,
+    item.minimo,
+    item.maximo
+  ]);
+
+  doc.autoTable({
+    startY: 35,
+    head: [["Descrição do Item", "Preço Médio", "Mediana", "Preço Mínimo", "Preço Máximo"]],
+    body,
+    styles: {
+      fontSize: 10,
+      lineWidth: 0.1,
+      lineColor: [0, 0, 0],
+      halign: "center",
+      valign: "middle"
+    },
+    headStyles: {
+      fillColor: [56, 178, 172] // cor-primaria
+    },
+    columnStyles: {
+      0: { cellWidth: 150, halign: "left" }
+    },
+    margin: { top: 35, bottom: 30 }
+  });
+
+  const pageHeight = doc.internal.pageSize.height;
+  const rodapeY = pageHeight - 20;
+
+  doc.setFontSize(10);
+  doc.text(`Fonte: Ministério da Economia - Dados abertos`, 15, rodapeY);
+  doc.text(`Relatório gerado via consulta pública - Portal de Compras Governamentais`, 15, rodapeY + 5);
+  doc.text(`Data da Geração do Relatório: ${hoje}`, 15, rodapeY + 10);
+
+  doc.save("relatorio_precos.pdf");
+}
+
+
+  function limparResultados(){
     estatisticasRelatorio = null;
     descricaoSelecionada = "";
-    document.getElementById("resultado").innerHTML = "";
-    document.getElementById("resultado").className = "";
+    const res = document.getElementById("resultado");
+    res.innerHTML = ""; res.className = "";
   }
 </script>
 </body>
