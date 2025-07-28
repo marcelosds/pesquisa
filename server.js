@@ -53,12 +53,29 @@ app.get("/", (req, res) => {
 });
 
 
-// Rota para obter os primeiros 100 itens (exemplo para preencher combo)
+// Rota paginada e ordenada por descrição
 app.get("/itens", (req, res) => {
-  res.json(CATMAT.slice(0, 100));
+  const pagina = parseInt(req.query.pagina) || 1;
+  const itensPorPagina = 100;
+
+  // Ordena em ordem alfabética crescente pela descrição
+  const ordenados = [...CATMAT].sort((a, b) =>
+    a.descricao.localeCompare(b.descricao, 'pt-BR', { sensitivity: 'base' })
+  );
+
+  const inicio = (pagina - 1) * itensPorPagina;
+  const fim = inicio + itensPorPagina;
+  const paginaAtual = ordenados.slice(inicio, fim);
+
+  res.json({
+    pagina,
+    totalPaginas: Math.ceil(CATMAT.length / itensPorPagina),
+    totalItens: CATMAT.length,
+    resultados: paginaAtual
+  });
 });
 
-// Rota para buscar por descrição ou código
+// Rota para buscar todos os itens que contenham o texto informado, ordenados alfabeticamente
 app.get("/buscar", (req, res) => {
   const termo = (req.query.q || "").toLowerCase();
 
@@ -66,12 +83,16 @@ app.get("/buscar", (req, res) => {
     return res.status(400).json({ erro: "Informe pelo menos 3 caracteres para busca." });
   }
 
-  const resultados = CATMAT.filter(item =>
+  const resultadosFiltrados = CATMAT.filter(item =>
     item.codigo?.toString().includes(termo) ||
     item.descricao?.toLowerCase().includes(termo)
   );
 
-  res.json(resultados.slice(0, 50));
+  const resultadosOrdenados = resultadosFiltrados.sort((a, b) =>
+    a.descricao.localeCompare(b.descricao, 'pt-BR', { sensitivity: 'base' })
+  );
+
+  res.json(resultadosOrdenados);
 });
 
 // Rota para buscar todos os preços do item com filtro por ano
