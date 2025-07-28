@@ -40,7 +40,7 @@
       background-color: var(--cor-primaria);
       color: white;
       font-weight: bold;
-      margin-top: 24px;
+      margin-top: 16px;
       cursor: pointer;
       border: none;
       transition: background 0.3s ease-in-out;
@@ -106,8 +106,9 @@
       <option value="2024">2024</option>
     </select>
 
-    <button onclick="buscarPreco()">Consultar Preço</button>
+    <button onclick="buscarPreco()">🔍 Consultar Preço</button>
     <button onclick="gerarRelatorio()">📄 Gerar Relatório - PDF</button>
+    <button onclick="limparResultados()">🗑️ Limpar Resultados Armazenados</button>
 
     <div id="resultado"></div>
   </div>
@@ -124,7 +125,7 @@
     const comboContainer = document.getElementById("comboContainer");
     document.getElementById("paginacao").innerHTML = "";
     comboContainer.innerHTML = "";
-    selecionados.clear(); // limpa seleção ao buscar novo termo
+    selecionados.clear();
     if (termo.length < 3) {
       comboContainer.innerHTML = '<div style="color:#aaa; padding: 8px;">Digite pelo menos 3 letras...</div>';
       return;
@@ -136,7 +137,6 @@
         comboContainer.innerHTML = '<div style="color:#aaa; padding: 8px;">Nenhum item encontrado.</div>';
         return;
       }
-      // Ordena resultados pela descrição em ordem alfabética crescente
       resultadosBusca = itens.sort((a,b) => a.descricao.localeCompare(b.descricao, 'pt-BR', {sensitivity:'base'}));
       paginaAtual = 1;
       exibirPagina();
@@ -155,7 +155,6 @@
     const inicio = (paginaAtual - 1) * itensPorPagina;
     const fim = inicio + itensPorPagina;
 
-    // Ordena a página atual também (por segurança, caso dados mudem)
     const paginaItens = resultadosBusca.slice(inicio, fim)
       .sort((a,b) => a.descricao.localeCompare(b.descricao, 'pt-BR', {sensitivity:'base'}));
 
@@ -189,7 +188,6 @@
       wrapper.appendChild(label);
       comboContainer.appendChild(wrapper);
 
-      // Espaçamento em branco (sem traço)
       const spacer = document.createElement("div");
       spacer.style.height = "6px";
       comboContainer.appendChild(spacer);
@@ -221,7 +219,6 @@
       return;
     }
     const ano = document.getElementById("ano").value;
-    resultadoEl.innerText = "Consultando...";
     resultadoEl.className = "";
     try {
       let todosDados = [], descricoesSelecionadas = [];
@@ -229,7 +226,6 @@
         const resp = await fetch(`/preco/${codigo}?ano=${ano}`);
         const json = await resp.json();
         if (json.dados && json.dados.length > 0) {
-          // Busca descrição no array geral (resultadosBusca)
           const item = resultadosBusca.find(i => i.codigo === codigo);
           const descr = item ? item.descricao : codigo;
           todosDados.push({codigo, descricao: descr, estatisticas: json.estatisticas});
@@ -241,8 +237,9 @@
         resultadoEl.className = "erro";
         return;
       }
-      descricaoSelecionada = descricoesSelecionadas.join(", ");
-      let html = `<strong>📊 Estatísticas Apuradas:</strong><br><br>`;
+      descricaoSelecionada += (descricaoSelecionada ? ", " : "") + descricoesSelecionadas.join(", ");
+      let html = resultadoEl.innerHTML;
+      html += `<br><strong>📊 Estatísticas Apuradas:</strong><br><br>`;
       todosDados.forEach(item => {
         const e = item.estatisticas;
         html += `<div style="margin-bottom:12px;padding:10px 14px;background-color:var(--cor-realce);border-radius:8px;">
@@ -261,13 +258,16 @@
       resultadoEl.innerHTML = html;
       resultadoEl.className = "sucesso";
 
-      estatisticasRelatorio = todosDados.map(item => ({
-        descricao: `${item.codigo} - ${item.descricao}`,
-        media: item.estatisticas.media,
-        mediana: item.estatisticas.mediana,
-        minimo: item.estatisticas.minimo,
-        maximo: item.estatisticas.maximo
-      }));
+      if (!estatisticasRelatorio) estatisticasRelatorio = [];
+      estatisticasRelatorio = estatisticasRelatorio.concat(
+        todosDados.map(item => ({
+          descricao: `${item.codigo} - ${item.descricao}`,
+          media: item.estatisticas.media,
+          mediana: item.estatisticas.mediana,
+          minimo: item.estatisticas.minimo,
+          maximo: item.estatisticas.maximo
+        }))
+      );
     } catch {
       estatisticasRelatorio = null;
       resultadoEl.innerText = "Erro ao consultar o preço.";
@@ -301,6 +301,13 @@
     doc.setFontSize(10);
     doc.text(`Data da Geração do Relatório: ${hoje}`, 15, doc.internal.pageSize.height - 10);
     doc.save("relatorio_precos.pdf");
+  }
+
+  function limparResultados() {
+    estatisticasRelatorio = null;
+    descricaoSelecionada = "";
+    document.getElementById("resultado").innerHTML = "";
+    document.getElementById("resultado").className = "";
   }
 </script>
 </body>

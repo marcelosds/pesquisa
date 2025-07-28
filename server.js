@@ -125,7 +125,6 @@ app.get("/preco/:codigo", async (req, res) => {
       resultados = resultados.filter(r => {
       const data = new Date(r.dataCompra);
       const ano = data.getFullYear().toString();
-      //console.log(`${ano}`);
       return ano === anoFiltro;
       });
     }
