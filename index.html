@@ -1,3 +1,4 @@
+<!-- 🟢 CÓDIGO HTML COMPLETO COM AJUSTE NO PDF GERADO -->
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -280,24 +281,33 @@
       alert("Consulte os preços antes.");
       return;
     }
-    const {jsPDF} = window.jspdf;
-    const doc = new jsPDF({orientation:"landscape"});
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation: "landscape" });
     const hoje = new Date().toLocaleDateString("pt-BR");
+
     doc.setFontSize(16);
-    doc.text("Preços Praticados - Governo Federal", 148.5, 20, {align:"center"});
-    doc.setFontSize(10);
-    const descricao = doc.splitTextToSize(`Itens selecionados: ${descricaoSelecionada}`, 270);
+    doc.text("Preços Praticados - Governo Federal", 148.5, 20, { align: "center" });
+
+ 
+    // Tabela
     const body = estatisticasRelatorio.map(item => [
       item.descricao, item.media, item.mediana, item.minimo, item.maximo
     ]);
     doc.autoTable({
-      startY: 15 + (descricao.length - 1) * 7,
-      head: [["Descrição do Item","Preço Médio","Mediana","Preço Mínimo","Preço Máximo"]],
+      startY: 30,
+      head: [["Descrição do Item", "Preço Médio", "Mediana", "Preço Mínimo", "Preço Máximo"]],
       body,
-      styles: {fontSize:10, lineWidth:0.1, lineColor:[0,0,0], halign:"center", valign:"middle"},
-      headStyles: {fillColor:[56,178,172]},
-      columnStyles: {0: {cellWidth:150, halign:"left"}, 1: {cellWidth:"auto"}, 2: {cellWidth:"auto"}, 3: {cellWidth:"auto"}, 4: {cellWidth:"auto"}}
+      styles: { fontSize: 10, lineWidth: 0.1, lineColor: [0, 0, 0], halign: "center", valign: "middle" },
+      headStyles: { fillColor: [56, 178, 172] },
+      columnStyles: {
+        0: { cellWidth: 150, halign: "left" },
+        1: { cellWidth: "auto" },
+        2: { cellWidth: "auto" },
+        3: { cellWidth: "auto" },
+        4: { cellWidth: "auto" }
+      }
     });
+
     doc.setFontSize(10);
     doc.text(`Data da Geração do Relatório: ${hoje}`, 15, doc.internal.pageSize.height - 10);
     doc.save("relatorio_precos.pdf");
