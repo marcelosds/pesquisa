@@ -64,7 +64,7 @@
 </head>
 <body>
   <div class="container">
-    <h2>Preços Praticados - Governo Federal</h2>
+    <h2>Preços Praticados - Compras Governamentais</h2>
 
     <label for="busca">🔍 Buscar item (mínimo 3 letras):</label>
     <input type="text" id="busca" placeholder="Ex: papel, caneta, 626816" oninput="buscarItens()" />
@@ -219,13 +219,9 @@
   const doc = new jsPDF({ orientation: "landscape" });
   const hoje = new Date().toLocaleDateString("pt-BR");
 
-  // Logo Base64 incorporado (Brasão ou logo institucional)
-  if (logoBase64) {
-  doc.addImage(logoBase64, 'PNG', 10, 10, 25, 25);
-  }
-
   doc.setFontSize(16);
-  doc.text("Preços Praticados - Compras Governamentais", 105, 20, { align: 'center' });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  doc.text("Preços Praticados - Compras Governamentais", pageWidth / 2, 20, { align: 'center' });
 
   const body = estatisticasRelatorio.map(item => [
     item.descricao,
@@ -259,9 +255,8 @@
   const rodapeY = pageHeight - 20;
 
   doc.setFontSize(10);
-  doc.text(`Fonte: Ministério da Economia - Dados abertos`, 15, rodapeY);
-  doc.text(`Relatório gerado via consulta pública - Portal de Compras Governamentais`, 15, rodapeY + 5);
-  doc.text(`Data da Geração do Relatório: ${hoje}`, 15, rodapeY + 10);
+  doc.text(`Fonte: Ministério da Economia - Dados Abertos - Portal de Compras Governamentais`, 15, rodapeY);
+  doc.text(`Data da Geração do Relatório: ${hoje}`, 15, rodapeY + 5);
 
   doc.save("relatorio_precos.pdf");
 }
