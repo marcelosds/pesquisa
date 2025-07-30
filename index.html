@@ -2,8 +2,10 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
-  <title>Consulta de Preço - Compras.gov.br</title>
+  <title>Consulta de Preço - Compras Governamentais</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
   <style>
@@ -18,11 +20,42 @@
       --cor-realce: #edfdfd;
       --borda: #e5e7eb;
     }
-    * { box-sizing: border-box; font-family: 'Segoe UI', Roboto, Helvetica, sans-serif; margin: 0; padding: 0; }
-    body { background-color: var(--cor-fundo); display: flex; flex-direction: column; align-items: center; min-height: 100vh; padding: 20px; }
-    .container { background-color: var(--cor-branca); padding: 32px; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.06); max-width: 600px; width: 100%; }
-    h2 { text-align: center; color: var(--cor-secundaria); margin-bottom: 24px; font-size: 24px; }
-    label { display: block; margin-top: 18px; margin-bottom: 6px; font-weight: 600; color: var(--cor-texto); }
+    * {
+      box-sizing: border-box;
+      font-family: 'Segoe UI', Roboto, Helvetica, sans-serif;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      background-color: var(--cor-fundo);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      padding: 20px;
+    }
+    .container {
+      background-color: var(--cor-branca);
+      padding: 32px;
+      border-radius: 16px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.06);
+      max-width: 600px;
+      width: 100%;
+      position: relative;
+    }
+    h2 {
+      text-align: center;
+      color: var(--cor-secundaria);
+      margin-bottom: 24px;
+      font-size: 24px;
+    }
+    label {
+      display: block;
+      margin-top: 18px;
+      margin-bottom: 6px;
+      font-weight: 600;
+      color: var(--cor-texto);
+    }
     input[type="text"], select, button {
       width: 100%;
       padding: 12px 14px;
@@ -54,16 +87,50 @@
       border-radius: 10px;
       font-size: 16px;
     }
-    .erro { background-color: var(--cor-erro); color: white; }
-    .sucesso { background-color: var(--cor-sucesso); color: var(--cor-secundaria); }
-    footer { text-align: center; margin-top: 24px; font-size: 14px; color: #888; }
-    #paginacao { margin-top: 12px; text-align: center; }
-    #paginacao button { width: auto; padding: 6px 12px; margin: 0 4px; font-size: 14px; }
-    #comboContainer { max-height: 240px; overflow-y: auto; border: 1px solid var(--borda); border-radius: 10px; padding: 8px; background-color: var(--cor-branca); }
+    .erro {
+      background-color: var(--cor-erro);
+      color: white;
+    }
+    .sucesso {
+      background-color: var(--cor-sucesso);
+      color: var(--cor-secundaria);
+    }
+    footer {
+      text-align: center;
+      margin-top: 24px;
+      font-size: 14px;
+      color: #888;
+    }
+    #paginacao {
+      margin-top: 12px;
+      text-align: center;
+    }
+    #paginacao button {
+      width: auto;
+      padding: 6px 12px;
+      margin: 0 4px;
+      font-size: 14px;
+    }
+    #comboContainer {
+      max-height: 240px;
+      overflow-y: auto;
+      border: 1px solid var(--borda);
+      border-radius: 10px;
+      padding: 8px;
+      background-color: var(--cor-branca);
+    }
+    .logout-button {
+      background-color: #e74c3c;
+      
+    }
+    .logout-button:hover {
+      background-color: #c0392b;
+    }
   </style>
 </head>
 <body>
   <div class="container">
+    
     <h2>Preços Praticados - Compras Governamentais</h2>
 
     <label for="busca">🔍 Buscar item (mínimo 3 letras):</label>
@@ -82,11 +149,40 @@
     <button onclick="buscarPreco()">🔍 Consultar Preço</button>
     <button onclick="gerarRelatorio()">📄 Gerar Relatório - PDF</button>
     <button onclick="limparResultados()">🗑️ Limpar Resultados Armazenados</button>
+    <button class="logout-button" onclick="logout()">🚪 Sair</button>
 
     <div id="resultado"></div>
   </div>
 
   <footer>© 2025 Desenvolvido por Marcelo Souza</footer>
+
+  <script>
+    // Configuração do Firebase
+    const firebaseConfig = {
+      apiKey: "AIzaSyA0ohnjNnhL4RnFdlvQb-tVYCjRUx38LFk",
+      authDomain: "consulta-preco-20a34.firebaseapp.com",
+      projectId: "consulta-preco-20a34",
+      storageBucket: "consulta-preco-20a34.appspot.com",
+      messagingSenderId: "SEU_SENDER_ID",
+      appId: "SUA_APP_ID"
+    };
+    firebase.initializeApp(firebaseConfig);
+
+    function logout() {
+      firebase.auth().signOut().then(() => {
+        window.location.href = "login.html";
+      }).catch(error => {
+        alert("Erro ao sair: " + error.message);
+      });
+    }
+
+    // Verificação de autenticação
+    firebase.auth().onAuthStateChanged(user => {
+      if (!user) {
+        window.location.href = "login.html";
+      }
+    });
+  </script>
 
 <script>
   let resultadosBusca = [], paginaAtual = 1, itensPorPagina = 100;
