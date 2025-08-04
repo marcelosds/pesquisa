@@ -113,33 +113,37 @@
 
   <footer>© 2025 Desenvolvido por Marcelo Souza</footer>
 
-  <script>
-    const firebaseConfig = {
-      apiKey: "AIzaSyA0ohnjNnhL4RnFdlvQb-tVYCjRUx38LFk",
-      authDomain: "consulta-preco-20a34.firebaseapp.com",
-      projectId: "consulta-preco-20a34",
-      storageBucket: "consulta-preco-20a34.appspot.com",
-      messagingSenderId: "SEU_SENDER_ID",
-      appId: "SUA_APP_ID"
-    };
-    firebase.initializeApp(firebaseConfig);
+  <!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js"></script>
 
-    function cadastrarUsuario() {
-      const email = document.getElementById("email").value;
-      const senha = document.getElementById("senha").value;
-      const msg = document.getElementById("mensagem");
+<script>
+  fetch('/firebase-config')
+    .then(res => res.json())
+    .then(firebaseConfig => {
+      firebase.initializeApp(firebaseConfig);
 
-      firebase.auth().createUserWithEmailAndPassword(email, senha)
-        .then(() => {
-          msg.textContent = "Usuário cadastrado com sucesso!";
-          msg.className = "mensagem sucesso";
-          setTimeout(() => window.location.href = "index.html", 1500);
-        })
-        .catch(error => {
-          msg.textContent = error.message;
-          msg.className = "mensagem erro";
-        });
-    }
-  </script>
+      // Função de cadastro
+      window.cadastrarUsuario = function () {
+        const email = document.getElementById("email").value;
+        const senha = document.getElementById("senha").value;
+        const msg = document.getElementById("mensagem");
+
+        firebase.auth().createUserWithEmailAndPassword(email, senha)
+          .then(() => {
+            msg.textContent = "Usuário cadastrado com sucesso!";
+            msg.className = "mensagem sucesso";
+            setTimeout(() => window.location.href = "index.html", 1500);
+          })
+          .catch(error => {
+            msg.textContent = error.message;
+            msg.className = "mensagem erro";
+          });
+      };
+    })
+    .catch(err => {
+      alert("Erro ao carregar configuração Firebase: " + err.message);
+    });
+</script>
 </body>
 </html>

@@ -1,12 +1,15 @@
+require("dotenv").config();
+
 const express = require("express");
 const axios = require("axios");
 const cors = require("cors");
 const fs = require("fs");
 const XLSX = require("xlsx");
 const path = require("path");
+const e = require("express");
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000; // ← Usa o valor do .env ou 3000
 
 // ============================
 // 1. CONFIGURAÇÕES
@@ -52,13 +55,24 @@ app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "index.html"));
 });
 
+// Rota do firebase
+app.get("/firebase-config", (req, res) => {
+  res.json({
+    apiKey: process.env.FIREBASE_API_KEY,
+    authDomain: process.env.FIREBASE_AUTH_DOMAIN,
+    projectId: process.env.FIREBASE_PROJECT_ID,
+    storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
+    messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID,
+    appId: process.env.FIREBASE_APP_ID
+  });
+});
+
 
 // Rota paginada e ordenada por descrição
 app.get("/itens", (req, res) => {
   const pagina = parseInt(req.query.pagina) || 1;
   const itensPorPagina = 100;
 
-  // Ordena em ordem alfabética crescente pela descrição
   const ordenados = [...CATMAT].sort((a, b) =>
     a.descricao.localeCompare(b.descricao, 'pt-BR', { sensitivity: 'base' })
   );
@@ -75,7 +89,7 @@ app.get("/itens", (req, res) => {
   });
 });
 
-// Rota para buscar todos os itens que contenham o texto informado, ordenados alfabeticamente
+// Rota de busca
 app.get("/buscar", (req, res) => {
   const termo = (req.query.q || "").toLowerCase();
 
@@ -95,12 +109,12 @@ app.get("/buscar", (req, res) => {
   res.json(resultadosOrdenados);
 });
 
-// Rota para buscar todos os preços do item com filtro por ano
+// Rota de preços com filtro por ano e criterioJulgamento
 app.get("/preco/:codigo", async (req, res) => {
   const codigoItemCatalogo = req.params.codigo;
-  const anoFiltro = req.query.ano; // <- parâmetro opcional
+  const anoFiltro = req.query.ano;
   const API_URL = "https://dadosabertos.compras.gov.br/modulo-pesquisa-preco/1_consultarMaterial";
-  const TOKEN = "3db72f4ebfecf6ba8ce3c867270fd86d"; // Em produção, use variável de ambiente
+  const TOKEN = process.env.TOKEN;
 
   try {
     const response = await axios.get(API_URL, {
@@ -110,39 +124,56 @@ app.get("/preco/:codigo", async (req, res) => {
       },
       params: {
         tamanhoPagina: 100,
-        codigoItemCatalogo
+        codigoItemCatalogo,
+        dataResultado: true
       }
     });
 
     let resultados = response.data.resultado || [];
 
-    if (resultados.length === 0) {
-      return res.status(404).json({ erro: "Nenhum preço encontrado para o item informado." });
-    }
-
-    // Filtrar por ano, se informado
+    // Filtro por ano (se fornecido)
     if (anoFiltro) {
       resultados = resultados.filter(r => {
-      const data = new Date(r.dataCompra);
-      const ano = data.getFullYear().toString();
-      return ano === anoFiltro;
+        const data = new Date(r.dataCompra);
+        return data.getFullYear().toString() === anoFiltro;
       });
     }
 
+    // Filtrar apenas os que possuem criterioJulgamento não vazio
+    resultados = resultados.filter(r =>
+      r.criterioJulgamento && r.criterioJulgamento.trim() !== ""
+    );
 
     if (resultados.length === 0) {
-      return res.status(404).json({ erro: "Nenhum resultado encontrado para o ano informado." });
+      return res.status(404).json({ erro: "Nenhum resultado encontrado com critério de julgamento." });
     }
 
     const formatarReal = valor => `R$ ${valor.toFixed(2).replace('.', ',')}`;
 
-    const precos = resultados.map(r => ({
-      precoUnitario: formatarReal(r.precoUnitario || 0),
-      nomeUnidadeFornecimento: r.nomeUnidadeFornecimento || "N/A",
-      marca: r.marca || "N/A",
-      estado: r.estado || "N/A",
-      dataCompra: r.dataCompra || "N/A"
+    // Primeiro, cria um array com os dados brutos mantendo o valor numérico do preço
+    let precos = resultados.map(r => ({
+      precoUnitario: r.precoUnitario || 0, // valor numérico
+      nomeOrgao: r.nomeOrgao || "",
+      quantidade: r.quantidade || 0,
+      nomeUnidadeFornecimento: r.nomeUnidadeFornecimento || "",
+      siglaUnidadeMedida: r.siglaUnidadeMedida || "",
+      nomeFornecedor: r.nomeFornecedor || "",
+      municipio: r.municipio || "",
+      estado: r.estado || "",
+      dataCompra: r.dataCompra || ""
     }));
+
+    // Ordenar pelo valor numérico do preço unitário (crescente)
+    precos.sort((a, b) => a.precoUnitario - b.precoUnitario);
+
+    // Depois de ordenar, formata o preço para o padrão R$
+    precos = precos.map(r => ({
+      ...r,
+      precoUnitario: formatarReal(r.precoUnitario)
+    }));
+
+    //console.log(precos);
+
 
     const valoresNumericos = resultados
       .map(r => r.precoUnitario)
@@ -180,10 +211,9 @@ app.get("/preco/:codigo", async (req, res) => {
   }
 });
 
-
 // ============================
 // 4. INICIAR SERVIDOR
 // ============================
 app.listen(PORT, () => {
-  console.log(`Servidor rodando em http://localhost:${PORT}`);
+  console.log(`Servidor rodando na porta:${PORT}`);
 });

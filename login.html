@@ -152,68 +152,73 @@
 
   <footer>© 2025 Desenvolvido por Marcelo Souza</footer>
 
-  <script>
-    const firebaseConfig = {
-      apiKey: "AIzaSyA0ohnjNnhL4RnFdlvQb-tVYCjRUx38LFk",
-      authDomain: "consulta-preco-20a34.firebaseapp.com",
-      projectId: "consulta-preco-20a34",
-      storageBucket: "consulta-preco-20a34.appspot.com",
-      messagingSenderId: "SEU_SENDER_ID",
-      appId: "SUA_APP_ID"
-    };
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js"></script>
 
-    firebase.initializeApp(firebaseConfig);
+<script>
+  fetch('/firebase-config')
+    .then(res => res.json())
+    .then(firebaseConfig => {
+      firebase.initializeApp(firebaseConfig);
 
-    function login() {
-      const email = document.getElementById("email").value;
-      const senha = document.getElementById("senha").value;
-      const msg = document.getElementById("mensagem");
+      // Função de login
+      window.login = function () {
+        const email = document.getElementById("email").value;
+        const senha = document.getElementById("senha").value;
+        const msg = document.getElementById("mensagem");
 
-      firebase.auth().signInWithEmailAndPassword(email, senha)
-        .then(() => {
-          msg.textContent = "Login realizado com sucesso!";
-          msg.className = "mensagem sucesso";
-          setTimeout(() => window.location.href = "index.html", 1000);
-        })
-        .catch(error => {
-          msg.textContent = error.message;
+        firebase.auth().signInWithEmailAndPassword(email, senha)
+          .then(() => {
+            msg.textContent = "Login realizado com sucesso!";
+            msg.className = "mensagem sucesso";
+            setTimeout(() => window.location.href = "index.html", 1000);
+          })
+          .catch(error => {
+            msg.textContent = error.message;
+            msg.className = "mensagem erro";
+          });
+      };
+
+      // Login com Google
+      window.loginComGoogle = function () {
+        const provider = new firebase.auth.GoogleAuthProvider();
+        firebase.auth().signInWithPopup(provider)
+          .then(() => {
+            window.location.href = "index.html";
+          })
+          .catch(error => {
+            const msg = document.getElementById("mensagem");
+            msg.textContent = error.message;
+            msg.className = "mensagem erro";
+          });
+      };
+
+      // Recuperar senha
+      window.recuperarSenha = function () {
+        const email = document.getElementById("email").value;
+        const msg = document.getElementById("mensagem");
+
+        if (!email) {
+          msg.textContent = "Digite seu email para recuperar a senha.";
           msg.className = "mensagem erro";
-        });
-    }
+          return;
+        }
 
-    function loginComGoogle() {
-      const provider = new firebase.auth.GoogleAuthProvider();
-      firebase.auth().signInWithPopup(provider)
-        .then(() => {
-          window.location.href = "index.html";
-        })
-        .catch(error => {
-          const msg = document.getElementById("mensagem");
-          msg.textContent = error.message;
-          msg.className = "mensagem erro";
-        });
-    }
+        firebase.auth().sendPasswordResetEmail(email)
+          .then(() => {
+            msg.textContent = "Email de redefinição de senha enviado com sucesso!";
+            msg.className = "mensagem sucesso";
+          })
+          .catch(error => {
+            msg.textContent = error.message;
+            msg.className = "mensagem erro";
+          });
+      };
+    })
+    .catch(err => {
+      alert("Erro ao carregar configuração Firebase: " + err.message);
+    });
+</script>
 
-    function recuperarSenha() {
-      const email = document.getElementById("email").value;
-      const msg = document.getElementById("mensagem");
-
-      if (!email) {
-        msg.textContent = "Digite seu email para recuperar a senha.";
-        msg.className = "mensagem erro";
-        return;
-      }
-
-      firebase.auth().sendPasswordResetEmail(email)
-        .then(() => {
-          msg.textContent = "Email de redefinição de senha enviado com sucesso!";
-          msg.className = "mensagem sucesso";
-        })
-        .catch(error => {
-          msg.textContent = error.message;
-          msg.className = "mensagem erro";
-        });
-    }
-  </script>
 </body>
 </html>

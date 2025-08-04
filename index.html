@@ -121,10 +121,59 @@
     }
     .logout-button {
       background-color: #e74c3c;
-      
     }
     .logout-button:hover {
       background-color: #c0392b;
+    }
+    /* Estilo para botão toggle detalhes */
+    #btnToggleDetalhes {
+      margin-top: 12px;
+      background-color: var(--cor-secundaria);
+      color: white;
+      font-weight: bold;
+      border-radius: 10px;
+      padding: 10px 14px;
+      border: none;
+      cursor: pointer;
+      transition: background 0.3s ease-in-out;
+      width: 100%;
+      text-align: center;
+    }
+    #btnToggleDetalhes:hover {
+      background-color: #1c2e40;
+    }
+    #detalhesCompras {
+      margin-top: 16px;
+      display: none;
+      max-height: 300px;
+      overflow-y: auto;
+      border: 1px solid var(--borda);
+      border-radius: 10px;
+      background-color: var(--cor-branca);
+      padding: 12px 16px;
+    }
+    #detalhesCompras > div {
+      margin-bottom: 16px;
+      padding: 12px;
+      background-color: var(--cor-realce);
+      border-radius: 10px;
+      font-size: 14px;
+      color: var(--cor-texto);
+    }
+    #detalhesCompras > div strong {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 15px;
+    }
+    #detalhesCompras .linha {
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    #detalhesCompras .linha div {
+      flex: 1 1 45%;
+      min-width: 140px;
     }
   </style>
 </head>
@@ -152,42 +201,46 @@
     <button class="logout-button" onclick="logout()">🚪 Sair</button>
 
     <div id="resultado"></div>
+    <!-- Botão para mostrar/esconder detalhes -->
+    <button id="btnToggleDetalhes" style="display:none;" aria-expanded="false" aria-controls="detalhesCompras">🧾 Mostrar detalhes das compras</button>
+    <!-- Container dos detalhes colapsáveis -->
+    <div id="detalhesCompras" aria-live="polite"></div>
   </div>
 
   <footer>© 2025 Desenvolvido por Marcelo Souza</footer>
 
-  <script>
-    // Configuração do Firebase
-    const firebaseConfig = {
-      apiKey: "AIzaSyA0ohnjNnhL4RnFdlvQb-tVYCjRUx38LFk",
-      authDomain: "consulta-preco-20a34.firebaseapp.com",
-      projectId: "consulta-preco-20a34",
-      storageBucket: "consulta-preco-20a34.appspot.com",
-      messagingSenderId: "SEU_SENDER_ID",
-      appId: "SUA_APP_ID"
-    };
-    firebase.initializeApp(firebaseConfig);
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js"></script>
 
-    function logout() {
-      firebase.auth().signOut().then(() => {
-        window.location.href = "login.html";
-      }).catch(error => {
-        alert("Erro ao sair: " + error.message);
+<script>
+  fetch('/firebase-config')
+    .then(response => response.json())
+    .then(firebaseConfig => {
+      firebase.initializeApp(firebaseConfig);
+
+      firebase.auth().onAuthStateChanged(user => {
+        if (!user) {
+          window.location.href = "login.html";
+        }
       });
-    }
-
-    // Verificação de autenticação
-    firebase.auth().onAuthStateChanged(user => {
-      if (!user) {
-        window.location.href = "login.html";
-      }
+    })
+    .catch(err => {
+      alert("Erro ao carregar configuração Firebase: " + err.message);
     });
-  </script>
+
+  function logout() {
+    firebase.auth().signOut()
+      .then(() => window.location.href = "login.html")
+      .catch(error => alert("Erro ao sair: " + error.message));
+  }
+</script>
+
 
 <script>
   let resultadosBusca = [], paginaAtual = 1, itensPorPagina = 100;
   let estatisticasRelatorio = null, descricaoSelecionada = "";
   let selecionados = new Set();
+  let detalhesComprasRelatorio = [];
 
   async function buscarItens() {
     const termo = document.getElementById("busca").value.trim();
@@ -195,6 +248,7 @@
     document.getElementById("paginacao").innerHTML = "";
     combo.innerHTML = "";
     selecionados.clear();
+    esconderDetalhesCompras();
     if (termo.length < 3) {
       combo.innerHTML = '<div style="color:#aaa; padding:8px;">Digite pelo menos 3 letras...</div>';
       return;
@@ -252,30 +306,54 @@
 
   async function buscarPreco() {
     const resultadoEl = document.getElementById("resultado");
+    const btnToggleDetalhes = document.getElementById("btnToggleDetalhes");
+    const detalhesDiv = document.getElementById("detalhesCompras");
+
     const cods = Array.from(selecionados);
     if (cods.length === 0) {
-      resultadoEl.innerText = "Selecione pelo menos um item válido."; resultadoEl.className="erro";
+      resultadoEl.innerText = "Selecione pelo menos um item válido.";
+      resultadoEl.className = "erro";
+      esconderDetalhesCompras();
       return;
     }
     const ano = document.getElementById("ano").value;
     try {
       let todosDados = [], descrs = [];
+      detalhesComprasRelatorio = []; // limpa os detalhes para o novo relatório
       for (const codigo of cods) {
         const resp = await fetch(`/preco/${codigo}?ano=${ano}`);
         const json = await resp.json();
         if (json.dados && json.dados.length) {
-          const item = resultadosBusca.find(i=>i.codigo===codigo);
+          const item = resultadosBusca.find(i => i.codigo === codigo);
           const descr = item ? item.descricao : codigo;
-          todosDados.push({codigo, descricao:descr, estatisticas: json.estatisticas});
+          todosDados.push({ codigo, descricao: descr, estatisticas: json.estatisticas });
           descrs.push(`${codigo} - ${descr}`);
+          json.dados.forEach(dado => {
+            detalhesComprasRelatorio.push({
+              codigo,
+              descricao: descr,
+              precoUnitario: dado.precoUnitario || 0,
+              nomeOrgao: dado.nomeOrgao || "N/A",
+              quantidade: dado.quantidade || 0,
+              nomeUnidadeFornecimento: dado.nomeUnidadeFornecimento || "N/A",
+              siglaUnidadeMedida: dado.siglaUnidadeMedida || "N/A",
+              nomeFornecedor: dado.nomeFornecedor || "N/A",
+              municipio: dado.municipio || "N/A",
+              estado: dado.estado || "N/A",
+              dataCompra: dado.dataCompra || "N/A"
+            });
+          });
         }
       }
       if (!todosDados.length) {
-        resultadoEl.innerText = "❌ Nenhum preço encontrado."; resultadoEl.className="erro";
+        resultadoEl.innerText = "❌ Nenhum preço encontrado.";
+        resultadoEl.className = "erro";
+        esconderDetalhesCompras();
         return;
       }
       descricaoSelecionada += (descricaoSelecionada ? ", " : "") + descrs.join(", ");
-      let html = resultadoEl.innerHTML || ""; html += `<br><strong>📊 Estatísticas Apuradas:</strong><br><br>`;
+      let html = resultadoEl.innerHTML || "";
+      html += `<br><strong>📊 Estatísticas Apuradas:</strong><br><br>`;
       todosDados.forEach(item => {
         const e = item.estatisticas;
         html += `<div style="margin-bottom:12px;padding:10px 14px;background-color:var(--cor-realce);border-radius:8px;">
@@ -291,78 +369,208 @@
         </div>`;
       });
       html += `<br><small>Ano filtrado: <strong>${ano}</strong></small>`;
-      resultadoEl.innerHTML = html; resultadoEl.className="sucesso";
+      resultadoEl.innerHTML = html;
+      resultadoEl.className = "sucesso";
+
       if (!estatisticasRelatorio) estatisticasRelatorio = [];
-      estatisticasRelatorio = estatisticasRelatorio.concat(todosDados.map(item=>({
-        descricao:`${item.codigo} - ${item.descricao}`,
-        media:item.estatisticas.media,
-        mediana:item.estatisticas.mediana,
-        minimo:item.estatisticas.minimo,
-        maximo:item.estatisticas.maximo
+      estatisticasRelatorio = estatisticasRelatorio.concat(todosDados.map(item => ({
+        descricao: `${item.codigo} - ${item.descricao}`,
+        media: item.estatisticas.media,
+        mediana: item.estatisticas.mediana,
+        minimo: item.estatisticas.minimo,
+        maximo: item.estatisticas.maximo
       })));
+
+      if (detalhesComprasRelatorio.length > 0) {
+        montarDetalhesCompras();
+        btnToggleDetalhes.style.display = "block";
+        btnToggleDetalhes.setAttribute("aria-expanded", "false");
+        btnToggleDetalhes.textContent = "🧾 Mostrar detalhes das compras";
+        esconderDetalhesCompras();
+      } else {
+        btnToggleDetalhes.style.display = "none";
+        detalhesDiv.innerHTML = "";
+      }
     } catch {
       estatisticasRelatorio = null;
-      resultadoEl.innerText="Erro ao consultar o preço."; resultadoEl.className="erro";
+      resultadoEl.innerText = "Erro ao consultar o preço.";
+      resultadoEl.className = "erro";
+      esconderDetalhesCompras();
     }
   }
 
-  function gerarRelatorio() {
-  if (!estatisticasRelatorio || !estatisticasRelatorio.length) {
-    return alert("Consulte os preços antes.");
+  function montarDetalhesCompras() {
+    const detalhesDiv = document.getElementById("detalhesCompras");
+    detalhesDiv.innerHTML = "";
+
+    detalhesComprasRelatorio.forEach(item => {
+      const bloco = document.createElement("div");
+
+      bloco.innerHTML = `
+        <div class="linha">
+          <div><strong>Órgão Comprador:</strong> ${item.nomeOrgao}</div>
+          <div><strong>Fornecedor:</strong> ${item.nomeFornecedor}</div>
+        </div>
+        <div class="linha">
+          <div><strong>Quantidade:</strong> ${item.quantidade}</div>
+          <div><strong>Unidade:</strong> ${item.nomeUnidadeFornecimento}</div>
+          <div><strong>Preço Unitário:</strong> ${item.precoUnitario.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>
+        </div>
+        <div class="linha">
+          <div><strong>Município/UF:</strong> ${item.municipio} - ${item.estado}</div>
+          <div><strong>Data da Compra:</strong> ${item.dataCompra}</div>
+        </div>
+      `;
+
+      detalhesDiv.appendChild(bloco);
+    });
   }
 
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ orientation: "landscape" });
-  const hoje = new Date().toLocaleDateString("pt-BR");
+  function esconderDetalhesCompras() {
+    const detalhesDiv = document.getElementById("detalhesCompras");
+    const btnToggleDetalhes = document.getElementById("btnToggleDetalhes");
+    detalhesDiv.style.display = "none";
+    btnToggleDetalhes.setAttribute("aria-expanded", "false");
+    btnToggleDetalhes.textContent = "🧾 Mostrar detalhes das compras";
+  }
 
-  doc.setFontSize(16);
-  const pageWidth = doc.internal.pageSize.getWidth();
-  doc.text("Preços Praticados - Compras Governamentais", pageWidth / 2, 20, { align: 'center' });
-
-  const body = estatisticasRelatorio.map(item => [
-    item.descricao,
-    item.media,
-    item.mediana,
-    item.minimo,
-    item.maximo
-  ]);
-
-  doc.autoTable({
-    startY: 35,
-    head: [["Descrição do Item", "Preço Médio", "Mediana", "Preço Mínimo", "Preço Máximo"]],
-    body,
-    styles: {
-      fontSize: 10,
-      lineWidth: 0.1,
-      lineColor: [0, 0, 0],
-      halign: "center",
-      valign: "middle"
-    },
-    headStyles: {
-      fillColor: [56, 178, 172] // cor-primaria
-    },
-    columnStyles: {
-      0: { cellWidth: 150, halign: "left" }
-    },
-    margin: { top: 35, bottom: 30 }
+  document.getElementById("btnToggleDetalhes").addEventListener("click", () => {
+    const detalhesDiv = document.getElementById("detalhesCompras");
+    const btnToggleDetalhes = document.getElementById("btnToggleDetalhes");
+    const isExpanded = btnToggleDetalhes.getAttribute("aria-expanded") === "true";
+    if (isExpanded) {
+      detalhesDiv.style.display = "none";
+      btnToggleDetalhes.setAttribute("aria-expanded", "false");
+      btnToggleDetalhes.textContent = "🧾 Mostrar detalhes das compras";
+    } else {
+      detalhesDiv.style.display = "block";
+      btnToggleDetalhes.setAttribute("aria-expanded", "true");
+      btnToggleDetalhes.textContent = "🔽 Ocultar detalhes das compras";
+    }
   });
 
-  const pageHeight = doc.internal.pageSize.height;
-  const rodapeY = pageHeight - 20;
+  function gerarRelatorio() {
+    if (!estatisticasRelatorio || !estatisticasRelatorio.length) {
+      return alert("Consulte os preços antes.");
+    }
 
-  doc.setFontSize(10);
-  doc.text(`Fonte: Ministério da Economia - Dados Abertos - Portal de Compras Governamentais`, 15, rodapeY);
-  doc.text(`Data da Geração do Relatório: ${hoje}`, 15, rodapeY + 5);
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation: "landscape" });
+    const hoje = new Date().toLocaleDateString("pt-BR");
 
-  doc.save("relatorio_precos.pdf");
-}
+    doc.setFontSize(16);
+    const pageWidth = doc.internal.pageSize.getWidth();
+    doc.text("Preços Praticados - Compras Governamentais", pageWidth / 2, 20, { align: 'center' });
 
+    // Tabela resumo estatísticas
+    const bodyResumo = estatisticasRelatorio.map(item => [
+      item.descricao,
+      item.media,
+      item.mediana,
+      item.minimo,
+      item.maximo
+    ]);
+
+    doc.autoTable({
+      startY: 35,
+      head: [["Descrição do Item", "Preço Médio", "Mediana", "Preço Mínimo", "Preço Máximo"]],
+      body: bodyResumo,
+      styles: {
+        fontSize: 10,
+        lineWidth: 0.1,
+        lineColor: [0, 0, 0],
+        halign: "center",
+        valign: "middle"
+      },
+      headStyles: {
+        fillColor: [56, 178, 172] // cor-primaria
+      },
+      columnStyles: {
+        0: { cellWidth: 150, halign: "left" }
+      },
+      margin: { top: 35, bottom: 30 }
+    });
+
+    // Tabela detalhada de compras
+    if (detalhesComprasRelatorio.length > 0) {
+      const startY = doc.lastAutoTable.finalY + 15;
+      doc.setFontSize(14);
+      doc.text("Detalhes das Compras", pageWidth / 2, startY, { align: "center" });
+
+      const bodyDetalhes = detalhesComprasRelatorio.map(item => {
+      const dataFormatada = new Date(item.dataCompra).toLocaleDateString('pt-BR', {
+        timeZone: 'UTC' // evita problemas de fuso horário
+      });
+
+      return [
+        item.nomeOrgao,
+        item.quantidade,
+        item.nomeUnidadeFornecimento,
+        item.precoUnitario.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
+        item.nomeFornecedor,
+        `${item.municipio} - ${item.estado}`,
+        dataFormatada
+      ];
+    });
+
+
+      doc.autoTable({
+        startY: startY + 7,
+        head: [
+          [
+            "Órgão Comprador",
+            "Quantidade",
+            "Unidade Medida",
+            "Preço Unitário",
+            "Fornecedor",
+            "Município - Estado",
+            "Data da Compra"
+          ]
+        ],
+        body: bodyDetalhes,
+        styles: {
+          fontSize: 8,
+          lineWidth: 0.1,
+          lineColor: [0, 0, 0],
+          halign: "center",
+          valign: "middle"
+        },
+        headStyles: {
+          fillColor: [56, 178, 172]
+        },
+        columnStyles: {
+          0: { cellWidth: 70, halign: "left" },
+          1: { cellWidth: 20, halign: "center" },
+          2: { cellWidth: 20, halign: "center" },
+          3: { cellWidth: 30, halign: "center" },
+          4: { cellWidth: 60, halign: "left" },
+          5: { cellWidth: 40, halign: "center" },
+          6: { cellWidth: 30, halign: "center" }
+        },
+      });
+    }
+
+    const pageHeight = doc.internal.pageSize.height;
+    const rodapeY = pageHeight - 20;
+
+    doc.setFontSize(10);
+    doc.text(`Fonte: Ministério da Economia - Dados Abertos - Portal de Compras Governamentais`, 15, rodapeY);
+    doc.text(`Data da Geração do Relatório: ${hoje}`, 15, rodapeY + 5);
+
+    doc.save("relatorio_precos.pdf");
+  }
 
   function limparResultados(){
     estatisticasRelatorio = null;
     descricaoSelecionada = "";
+    detalhesComprasRelatorio = [];
     const res = document.getElementById("resultado");
     res.innerHTML = ""; res.className = "";
+    esconderDetalhesCompras();
+    selecionados.clear();
+    document.getElementById("comboContainer").innerHTML = "";
+    document.getElementById("paginacao").innerHTML = "";
+    document.getElementById("busca").value = "";
   }
 </script>
 </body>
