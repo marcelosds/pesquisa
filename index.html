@@ -184,7 +184,7 @@
     <img id="logoRelatorio" src="logo.png" alt="Logotipo" style="display:none;">
 
     
-    <h2>Preços Praticados - Compras Governamentais</h2>
+    <h2>Preços Praticados - Contratações Públicas</h2>
 
     <label for="busca">🔍 Buscar item (mínimo 3 letras):</label>
     <input type="text" id="busca" placeholder="Ex: papel, caneta, 626816" oninput="buscarItens()" />
@@ -193,11 +193,43 @@
     <div id="comboContainer" aria-label="Resultados da busca" role="listbox"></div>
     <div id="paginacao"></div>
 
-    <label for="ano">📅 Ano da Compra:</label>
+    <label for="ano">📅 Ano da Contratação:</label>
     <select id="ano">
       <option value="2025" selected>2025</option>
       <option value="2024">2024</option>
     </select>
+    <label for="estado">📍 Estado da Contratação:</label>
+    <select id="estado">
+      <option value="Todos" selected>Todos</option>
+      <option value="AC">Acre (AC)</option>
+      <option value="AL">Alagoas (AL)</option>
+      <option value="AP">Amapá (AP)</option>
+      <option value="AM">Amazonas (AM)</option>
+      <option value="BA">Bahia (BA)</option>
+      <option value="CE">Ceará (CE)</option>
+      <option value="DF">Distrito Federal (DF)</option>
+      <option value="ES">Espírito Santo (ES)</option>
+      <option value="GO">Goiás (GO)</option>
+      <option value="MA">Maranhão (MA)</option>
+      <option value="MT">Mato Grosso (MT)</option>
+      <option value="MS">Mato Grosso do Sul (MS)</option>
+      <option value="MG">Minas Gerais (MG)</option>
+      <option value="PA">Pará (PA)</option>
+      <option value="PB">Paraíba (PB)</option>
+      <option value="PR">Paraná (PR)</option>
+      <option value="PE">Pernambuco (PE)</option>
+      <option value="PI">Piauí (PI)</option>
+      <option value="RJ">Rio de Janeiro (RJ)</option>
+      <option value="RN">Rio Grande do Norte (RN)</option>
+      <option value="RS">Rio Grande do Sul (RS)</option>
+      <option value="RO">Rondônia (RO)</option>
+      <option value="RR">Roraima (RR)</option>
+      <option value="SC">Santa Catarina (SC)</option>
+      <option value="SP">São Paulo (SP)</option>
+      <option value="SE">Sergipe (SE)</option>
+      <option value="TO">Tocantins (TO)</option>
+    </select>
+
 
     <button onclick="buscarPreco()">🔍 Consultar Preço</button>
     <button onclick="gerarRelatorio()">📄 Gerar Relatório - PDF</button>
@@ -247,30 +279,48 @@
   let detalhesComprasRelatorio = [];
 
   async function buscarItens() {
-    const termo = document.getElementById("busca").value.trim();
-    const combo = document.getElementById("comboContainer");
-    document.getElementById("paginacao").innerHTML = "";
-    combo.innerHTML = "";
-    selecionados.clear();
-    esconderDetalhesCompras();
-    if (termo.length < 3) {
-      combo.innerHTML = '<div style="color:#aaa; padding:8px;">Digite pelo menos 3 letras...</div>';
+  const termo = document.getElementById("busca").value.trim().toLowerCase();
+  const combo = document.getElementById("comboContainer");
+  document.getElementById("paginacao").innerHTML = "";
+  combo.innerHTML = "";
+  selecionados.clear();
+  esconderDetalhesCompras();
+
+  if (termo.length < 3) {
+    combo.innerHTML = '<div style="color:#aaa; padding:8px;">Digite pelo menos 3 letras...</div>';
+    return;
+  }
+
+  try {
+    const resp = await fetch(`/buscar?q=${encodeURIComponent(termo)}`);
+    let itens = await resp.json();
+
+    if (!itens || itens.length === 0) {
+      combo.innerHTML = '<div style="color:#aaa; padding:8px;">Nenhum item encontrado.</div>';
       return;
     }
-    try {
-      const resp = await fetch(`/buscar?q=${encodeURIComponent(termo)}`);
-      const itens = await resp.json();
-      if (!itens || itens.length === 0) {
-        combo.innerHTML = '<div style="color:#aaa; padding:8px;">Nenhum item encontrado.</div>';
-        return;
-      }
-      resultadosBusca = itens.sort((a,b) => a.descricao.localeCompare(b.descricao, 'pt-BR', {sensitivity:'base'}));
-      paginaAtual = 1;
-      exibirPagina();
-    } catch {
-      combo.innerHTML = '<div style="color:#e74c3c; padding:8px;">Erro ao buscar itens.</div>';
+
+    // Filtro: manter apenas itens cuja descrição começa com o termo
+    itens = itens.filter(item =>
+      item.descricao.toLowerCase().startsWith(termo)
+    );
+
+    if (itens.length === 0) {
+      combo.innerHTML = '<div style="color:#aaa; padding:8px;">Nenhum item encontrado com esse início.</div>';
+      return;
     }
+
+    resultadosBusca = itens.sort((a, b) =>
+      a.descricao.localeCompare(b.descricao, 'pt-BR', { sensitivity: 'base' })
+    );
+
+    paginaAtual = 1;
+    exibirPagina();
+  } catch {
+    combo.innerHTML = '<div style="color:#e74c3c; padding:8px;">Erro ao buscar itens.</div>';
   }
+}
+
 
   function exibirPagina() {
     const combo = document.getElementById("comboContainer");
@@ -322,6 +372,8 @@
   }
 
   const ano = document.getElementById("ano").value;
+  const estadoSelecionado = document.getElementById("estado").value;
+
   try {
     let descrs = [];
     const novosEstat = [], novosDetalhes = [];
@@ -329,11 +381,13 @@
     for (const codigo of cods) {
       const resp = await fetch(`/preco/${codigo}?ano=${ano}`);
       const json = await resp.json();
+
       if (json.dados && json.dados.length) {
         const item = resultadosBusca.find(i => i.codigo === codigo);
         const descr = item ? item.descricao : codigo;
         descrs.push(`${codigo} - ${descr}`);
 
+        // Estatísticas gerais
         novosEstat.push({
           descricao: `${codigo} - ${descr}`,
           media: json.estatisticas.media,
@@ -342,21 +396,24 @@
           maximo: json.estatisticas.maximo
         });
 
-        json.dados.forEach(dado => {
-          novosDetalhes.push({
-            codigo,
-            descricao: descr,
-            precoUnitario: dado.precoUnitario || 0,
-            nomeOrgao: dado.nomeOrgao || "N/A",
-            quantidade: dado.quantidade || 0,
-            nomeUnidadeFornecimento: dado.nomeUnidadeFornecimento || "N/A",
-            siglaUnidadeMedida: dado.siglaUnidadeMedida || "N/A",
-            nomeFornecedor: dado.nomeFornecedor || "N/A",
-            municipio: dado.municipio || "N/A",
-            estado: dado.estado || "N/A",
-            dataCompra: dado.dataCompra || "N/A"
+        // Detalhes filtrando por estado (apenas para o relatório PDF, não exibir no frontend)
+        json.dados
+          .filter(dado => estadoSelecionado === "Todos" || dado.estado === estadoSelecionado)
+          .forEach(dado => {
+            novosDetalhes.push({
+              codigo,
+              descricao: descr,
+              precoUnitario: dado.precoUnitario || 0,
+              nomeOrgao: dado.nomeOrgao || "N/A",
+              quantidade: dado.quantidade || 0,
+              nomeUnidadeFornecimento: dado.nomeUnidadeFornecimento || "N/A",
+              siglaUnidadeMedida: dado.siglaUnidadeMedida || "N/A",
+              nomeFornecedor: dado.nomeFornecedor || "N/A",
+              municipio: dado.municipio || "N/A",
+              estado: dado.estado || "N/A",
+              dataCompra: dado.dataCompra || "N/A"
+            });
           });
-        });
       }
     }
 
@@ -367,10 +424,9 @@
       return;
     }
 
-    // Acumular estatísticas e detalhes
+    // Acumular estatísticas e detalhes para o relatório
     if (!estatisticasRelatorio) estatisticasRelatorio = [];
     estatisticasRelatorio = estatisticasRelatorio.concat(novosEstat);
-
     detalhesComprasRelatorio = detalhesComprasRelatorio.concat(novosDetalhes);
 
     descricaoSelecionada += (descricaoSelecionada ? ", " : "") + descrs.join(", ");
@@ -391,20 +447,23 @@
         </div>
       </div>`;
     });
-    html += `<br><small>Ano filtrado: <strong>${ano}</strong></small>`;
+    html += `<br><small>Ano filtrado: <strong>${ano}</strong>`;
+    html += ` | Estado: <strong>${estadoSelecionado}</strong></small>`;
+
+    // Texto explicativo
+    html += `<br><br><div style="font-size:0.9rem;color:#444;padding:8px 12px;border-left:4px solid orange;background:#fffbe6;margin-top:12px;border-radius:6px;">
+      ⚠️ <strong>Atenção:</strong> Os valores médio, mediana, mínimo e máximo <strong>não consideram o filtro por estado</strong>, pois são calculados com base em todas as contratações nacionais do ano escolhido.<br>
+      O filtro por estado é aplicado apenas na geração do relatório com detalhes das contratações.
+    </div>`;
+    
+
     resultadoEl.innerHTML = html;
     resultadoEl.className = "sucesso";
 
-    if (detalhesComprasRelatorio.length > 0) {
-      montarDetalhesCompras();
-      btnToggleDetalhes.style.display = "block";
-      btnToggleDetalhes.setAttribute("aria-expanded", "false");
-      btnToggleDetalhes.textContent = "🧾 Mostrar detalhes das compras";
-      esconderDetalhesCompras();
-    } else {
-      btnToggleDetalhes.style.display = "none";
-      detalhesDiv.innerHTML = "";
-    }
+    // Ocultar botão de detalhes (não mostrar no frontend)
+    btnToggleDetalhes.style.display = "none";
+    detalhesDiv.innerHTML = "";
+    esconderDetalhesCompras();
 
   } catch (err) {
     estatisticasRelatorio = null;
