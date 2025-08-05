@@ -187,7 +187,7 @@
     <h2>Preços Praticados - Contratações Públicas</h2>
 
     <label for="busca">🔍 Buscar item (mínimo 3 letras):</label>
-    <input type="text" id="busca" placeholder="Ex: papel, caneta, 626816" oninput="buscarItens()" />
+    <input type="text" id="busca" placeholder="Ex: papel, caneta, água" oninput="buscarItens()" />
 
     <label for="comboContainer">📋 Resultados da busca:</label>
     <div id="comboContainer" aria-label="Resultados da busca" role="listbox"></div>
@@ -396,7 +396,7 @@
           maximo: json.estatisticas.maximo
         });
 
-        // Detalhes filtrando por estado (apenas para o relatório PDF, não exibir no frontend)
+        // Detalhes filtrando por estado (apenas para o relatório PDF)
         json.dados
           .filter(dado => estadoSelecionado === "Todos" || dado.estado === estadoSelecionado)
           .forEach(dado => {
@@ -418,8 +418,9 @@
     }
 
     if (!novosEstat.length) {
-      resultadoEl.innerText = "❌ Nenhum preço encontrado.";
-      resultadoEl.className = "erro";
+      const htmlAtual = resultadoEl.innerHTML || "";
+      resultadoEl.innerHTML = htmlAtual + `<br><span style="color:red;">❌ Nenhum preço encontrado para os itens selecionados.</span>`;
+      resultadoEl.className = "sucesso";
       esconderDetalhesCompras();
       return;
     }
@@ -450,12 +451,10 @@
     html += `<br><small>Ano filtrado: <strong>${ano}</strong>`;
     html += ` | Estado: <strong>${estadoSelecionado}</strong></small>`;
 
-    // Texto explicativo
     html += `<br><br><div style="font-size:0.9rem;color:#444;padding:8px 12px;border-left:4px solid orange;background:#fffbe6;margin-top:12px;border-radius:6px;">
-      ⚠️ <strong>Atenção:</strong> Os valores médio, mediana, mínimo e máximo <strong>não consideram o filtro por estado</strong>, pois são calculados com base em todas as contratações nacionais do ano escolhido.<br>
-      O filtro por estado é aplicado apenas na geração do relatório com detalhes das contratações.
+      ⚠️ <strong>Atenção:</strong> Os valores médio, mediana, mínimo e máximo <strong>não consideram o filtro por estado</strong>, pois são calculados com base em todas as contratações nacionais do ano selecionado.<br>
+      O filtro por estado é aplicado apenas na geração do relatório, demonstrando os detalhes das contratações.
     </div>`;
-    
 
     resultadoEl.innerHTML = html;
     resultadoEl.className = "sucesso";
@@ -473,6 +472,7 @@
     console.error(err);
   }
 }
+
 
 
   function montarDetalhesCompras() {
@@ -567,7 +567,7 @@
       doc.addImage(LOGO_BASE64, "PNG", 14, 10, 30, 15);
     }
     doc.setFontSize(20);
-    doc.text("Preços Praticados - Compras Governamentais", pageWidth / 2, 18, { align: 'center' });
+    doc.text("Preços Praticados - Contratações Públicas", pageWidth / 2, 18, { align: 'center' });
     doc.setFontSize(10);
     doc.text(`Data da Geração: ${hoje}`, pageWidth / 2, 26, { align: 'center' });
   };
